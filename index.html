@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>勉強きろく</title>
-  <!-- Chart.js：グラフを描くライブラリをインターネット経由で読み込む -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -18,11 +17,11 @@
       --input-bg: #f2f2f7;
       --radius: 14px;
       --radius-sm: 8px;
-      /* 教科カラー */
       --c-kokugo: #ff6b6b;
       --c-sansu:  #4b9eff;
       --c-rika:   #51cf66;
       --c-shakai: #ffa94d;
+      --c-total:  #ae3ec9;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -42,61 +41,36 @@
       -webkit-backdrop-filter: saturate(180%) blur(20px);
       border-bottom: 1px solid var(--border);
       padding: 14px 20px 0;
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      position: sticky; top: 0; z-index: 100;
     }
-    .header-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
-    }
+    .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .app-title { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
     .name-display {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 15px;
-      color: var(--text-secondary);
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 4px 8px;
-      border-radius: var(--radius-sm);
-      transition: background 0.15s;
+      display: flex; align-items: center; gap: 5px;
+      font-size: 15px; color: var(--text-secondary);
+      background: none; border: none; cursor: pointer;
+      padding: 4px 8px; border-radius: var(--radius-sm); transition: background 0.15s;
     }
     .name-display:hover { background: var(--border); }
     .name-display-name { color: var(--primary); font-weight: 600; }
 
-    /* ── タブバー（3つになったので文字を少し小さく） ── */
+    /* ── タブバー ── */
     .tab-bar { display: flex; }
     .tab-btn {
-      flex: 1;
-      padding: 10px 4px;
-      border: none;
-      background: none;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      cursor: pointer;
-      border-bottom: 2.5px solid transparent;
+      flex: 1; padding: 10px 4px; border: none; background: none;
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      cursor: pointer; border-bottom: 2.5px solid transparent;
       transition: color 0.15s, border-color 0.15s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 4px;
+      display: flex; align-items: center; justify-content: center; gap: 4px;
       white-space: nowrap;
     }
     .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
 
     /* ── モーダル ── */
     .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.4);
-      backdrop-filter: blur(4px);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 200; padding: 20px;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px); display: flex; align-items: center;
+      justify-content: center; z-index: 200; padding: 20px;
     }
     .modal-overlay.hidden { display: none; }
     .modal {
@@ -115,7 +89,7 @@
     }
     .modal input[type="text"]:focus { outline: none; border-color: var(--primary); }
 
-    /* ── ボタン ── */
+    /* ── 共通ボタン ── */
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
       padding: 14px 24px; border: none; border-radius: var(--radius);
@@ -124,13 +98,18 @@
     }
     .btn:active { transform: scale(0.97); opacity: 0.85; }
     .btn-primary { background: var(--primary); color: #fff; }
-
     .delete-btn {
       background: none; border: none; cursor: pointer;
       padding: 6px; color: var(--text-secondary); font-size: 18px;
       border-radius: 50%; transition: color 0.15s, background 0.15s; flex-shrink: 0;
     }
     .delete-btn:hover { color: var(--danger); background: #fff0ef; }
+    .edit-btn {
+      background: none; border: none; cursor: pointer;
+      padding: 6px; color: var(--text-secondary); font-size: 18px;
+      border-radius: 50%; transition: color 0.15s, background 0.15s; flex-shrink: 0;
+    }
+    .edit-btn:hover { color: var(--primary); background: #e8f0fe; }
 
     /* ── 共通レイアウト ── */
     main { padding: 20px 16px; max-width: 600px; margin: 0 auto; }
@@ -165,7 +144,6 @@
       -webkit-appearance: none; appearance: none; transition: border-color 0.15s;
     }
     input:focus { outline: none; border-color: var(--primary); }
-
     .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
     .section-title { font-size: 17px; font-weight: 700; }
     .total-badge { font-size: 13px; color: var(--text-secondary); }
@@ -173,7 +151,6 @@
     .empty-state { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
     .empty-state-emoji { font-size: 48px; margin-bottom: 12px; }
     .empty-state p { font-size: 16px; line-height: 1.6; }
-
     @keyframes slideIn {
       from { opacity: 0; transform: translateY(-6px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -192,7 +169,6 @@
     .time-input-row { display: flex; align-items: center; gap: 8px; }
     .time-input-row input { flex: 1; }
     .time-unit { font-size: 16px; color: var(--text-secondary); white-space: nowrap; }
-
     .study-record-item {
       background: var(--card); border-radius: var(--radius);
       padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
@@ -209,50 +185,96 @@
     .record-time { font-size: 20px; font-weight: 700; color: var(--primary); margin-right: 8px; white-space: nowrap; }
     .record-time span { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
 
-    /* ── 組分けテストタブ ── */
-    .test-meta-row {
-      display: grid; grid-template-columns: 1fr 1fr;
-      gap: 10px; margin-bottom: 14px;
+    /* ── 組分けテストタブ（新デザイン） ── */
+    .test-meta-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px;
     }
-    .test-meta-row .form-group { margin-bottom: 0; }
-    .test-subject-row { display: flex; gap: 8px; flex-wrap: wrap; }
-    .test-subject-btn {
-      padding: 9px 18px; border: 1.5px solid var(--border); border-radius: 100px;
-      background: none; font-size: 15px; font-weight: 600;
-      cursor: pointer; transition: all 0.15s; color: var(--text);
+    .test-meta-grid .form-group { margin-bottom: 0; }
+
+    /* 編集中バナー */
+    .edit-mode-banner {
+      display: flex; align-items: center; justify-content: space-between;
+      background: #fff8e1; border: 1.5px solid #ffd54f;
+      border-radius: var(--radius-sm); padding: 10px 14px;
+      margin-bottom: 16px; font-size: 14px; font-weight: 600; color: #795548;
     }
-    .test-subject-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
-    .review-card-check-label {
-      display: flex; align-items: center; justify-content: center;
-      gap: 3px; margin-top: 5px; cursor: pointer; user-select: none;
+    .cancel-edit-btn {
+      padding: 5px 14px; border: 1.5px solid #ffd54f; border-radius: 100px;
+      background: none; font-size: 13px; font-weight: 600; color: #795548; cursor: pointer;
     }
-    .review-card-check-label input[type="checkbox"] {
-      width: 14px; height: 14px; accent-color: #34c759; cursor: pointer; flex-shrink: 0;
+    .cancel-edit-btn:hover { background: #ffd54f30; }
+
+    /* 教科入力セクション */
+    .subject-sections-label {
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      margin-bottom: 10px; display: block;
     }
-    .review-card-check-label span { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
-    .review-card-check-label:has(input:checked) span { color: #1a7c3a; }
-    .review-card-date {
-      width: 100%; margin-top: 5px; padding: 4px 6px; font-size: 11px;
-      border: 1px solid var(--border); border-radius: 6px;
-      background: var(--card); color: var(--text); text-align: center;
+    .subject-section {
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 12px 14px; margin-bottom: 8px; background: var(--bg);
     }
-    .review-card-date:focus { outline: none; border-color: #34c759; }
-    .score-entry-row {
-      display: flex; align-items: center; gap: 10px; margin-top: 14px;
+    .subject-section-header {
+      font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px;
     }
-    .score-entry-row input[type="number"] {
-      flex: 1; padding: 12px 14px; font-size: 22px; font-weight: 700;
-      text-align: center; border: 1.5px solid var(--border); border-radius: var(--radius-sm);
-      background: var(--input-bg); transition: border-color 0.15s;
+    /* 教科内の3列グリッド（点数・偏差値・平均点） */
+    .subject-input-grid {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;
     }
-    .score-entry-row input:focus { outline: none; border-color: var(--primary); }
-    .score-entry-unit { font-size: 16px; color: var(--text-secondary); white-space: nowrap; }
+    .sic-label {
+      display: block; font-size: 11px; font-weight: 600;
+      color: var(--text-secondary); margin-bottom: 4px;
+    }
+    .sic-input {
+      width: 100%; padding: 8px 4px; font-size: 16px; font-weight: 600;
+      text-align: center; border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm); background: var(--card);
+      color: var(--text); transition: border-color 0.15s;
+      -webkit-appearance: none; appearance: none;
+    }
+    .sic-input:focus { outline: none; border-color: var(--primary); }
+    /* 解き直し行 */
+    .review-row {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    .review-cb-label {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 13px; font-weight: 600; color: var(--text);
+      cursor: pointer; user-select: none; white-space: nowrap;
+    }
+    .review-cb-label input[type="checkbox"] {
+      width: 16px; height: 16px; accent-color: #34c759; cursor: pointer;
+    }
+    .review-date-inp {
+      flex: 1; min-width: 130px; max-width: 180px;
+      padding: 7px 10px; font-size: 13px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--card); color: var(--text); transition: border-color 0.15s;
+    }
+    .review-date-inp:focus { outline: none; border-color: #34c759; }
+
+    /* 総合セクション */
+    .total-section {
+      background: #eef4ff; border-radius: var(--radius-sm);
+      padding: 14px 16px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    }
+    .total-auto {
+      text-align: center; min-width: 80px;
+    }
+    .total-auto-label { font-size: 11px; color: var(--text-secondary); font-weight: 600; margin-bottom: 4px; }
+    .total-auto-value { font-size: 28px; font-weight: 800; color: var(--primary); line-height: 1; }
+    .total-dev-wrap { flex: 1; min-width: 130px; }
+    .total-dev-label {
+      font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;
+    }
+
+    /* テストカード（新テーブルレイアウト） */
     .test-card {
       background: var(--card); border-radius: var(--radius);
       padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); animation: slideIn 0.2s ease;
     }
     .test-card-header {
-      display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;
+      display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px;
     }
     .test-card-title-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
     .test-card-round { font-size: 20px; font-weight: 800; letter-spacing: -0.3px; }
@@ -265,120 +287,59 @@
       background: #e8f0fe; padding: 2px 8px; border-radius: 100px;
     }
     .test-card-date { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
-    .test-score-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .test-score-cell {
-      background: var(--bg); border-radius: var(--radius-sm); padding: 10px 6px; text-align: center;
+    .card-btns { display: flex; gap: 2px; }
+    /* スコアテーブル */
+    .tc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .tc-table th {
+      font-size: 10px; font-weight: 600; color: var(--text-secondary);
+      padding: 3px 3px 6px; text-align: center; border-bottom: 1.5px solid var(--border);
     }
-    .test-score-cell-subject {
-      font-size: 11px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; white-space: nowrap;
+    .tc-table th:first-child { text-align: left; }
+    .tc-table td { padding: 6px 3px; text-align: center; border-bottom: 1px solid var(--bg); vertical-align: middle; }
+    .tc-table tr:last-child td { border-bottom: none; }
+    .tc-sub   { text-align: left !important; font-weight: 600; white-space: nowrap; }
+    .tc-score { font-size: 14px; font-weight: 700; }
+    .tc-dev   { font-size: 14px; font-weight: 700; color: var(--primary); }
+    .tc-avg   { color: var(--text-secondary); }
+    .tc-empty { color: var(--border); }
+    .tc-total td { background: #f0f4ff; font-weight: 700; }
+    .tc-total td:first-child { border-radius: 6px 0 0 6px; }
+    .tc-total td:last-child  { border-radius: 0 6px 6px 0; }
+    .rev-badge {
+      display: inline-flex; align-items: center; gap: 2px; font-size: 10px; font-weight: 600;
+      color: #1a7c3a; background: #e6f9ed; border-radius: 100px; padding: 2px 6px; white-space: nowrap;
     }
-    .test-score-cell-value { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1; }
-    .test-score-cell-value.no-score { font-size: 18px; color: var(--border); }
-    .test-score-cell-unit { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+    .rev-none { font-size: 12px; color: var(--border); }
 
     /* ── ダッシュボードタブ ── */
-
-    /* グラフのキャンバスを囲むラッパー。overflow:auto でスクロール対応 */
-    .chart-wrap {
-      position: relative;
-      width: 100%;
-      /* スマホで折れ線グラフが細長くなりすぎないよう最小高さを設定 */
-      min-height: 220px;
-    }
-
-    /* 凡例（グラフの色説明） */
+    .chart-wrap { position: relative; width: 100%; min-height: 220px; }
     .chart-legend {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
+      display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px;
     }
     .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text-secondary);
+      display: flex; align-items: center; gap: 5px;
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
     }
-    .legend-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .legend-dash {
+      width: 16px; border-top: 2.5px dashed; flex-shrink: 0;
     }
-
-    /* 解き直し進捗：ドーナツグラフ + 教科別バー */
-    .review-progress-wrap {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-    .review-donut-wrap {
-      width: 130px;
-      height: 130px;
-      flex-shrink: 0;
-      position: relative;
-    }
+    /* 解き直し進捗ドーナツ */
+    .review-progress-wrap { display: flex; align-items: center; gap: 20px; }
+    .review-donut-wrap { width: 130px; height: 130px; flex-shrink: 0; position: relative; }
     .review-donut-label {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; pointer-events: none;
     }
-    .review-donut-pct {
-      font-size: 26px;
-      font-weight: 800;
-      color: var(--text);
-      line-height: 1;
-    }
-    .review-donut-sub {
-      font-size: 11px;
-      color: var(--text-secondary);
-      margin-top: 2px;
-    }
-    .review-bars {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .review-bar-row { }
-    .review-bar-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      font-weight: 600;
-      margin-bottom: 4px;
-    }
-    .review-bar-track {
-      height: 8px;
-      background: var(--border);
-      border-radius: 100px;
-      overflow: hidden;
-    }
-    .review-bar-fill {
-      height: 100%;
-      border-radius: 100px;
-      transition: width 0.4s ease;
-    }
-
-    /* KPIタイル（合計時間など） */
-    .kpi-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 0;
-    }
-    .kpi-tile {
-      background: var(--bg);
-      border-radius: var(--radius-sm);
-      padding: 14px 12px;
-      text-align: center;
-    }
+    .review-donut-pct { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1; }
+    .review-donut-sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+    .review-bars { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+    .review-bar-label { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    .review-bar-track { height: 8px; background: var(--border); border-radius: 100px; overflow: hidden; }
+    .review-bar-fill { height: 100%; border-radius: 100px; transition: width 0.4s ease; }
+    /* KPIタイル */
+    .kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .kpi-tile { background: var(--bg); border-radius: var(--radius-sm); padding: 14px 12px; text-align: center; }
     .kpi-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: 4px; }
     .kpi-value { font-size: 24px; font-weight: 800; color: var(--text); }
     .kpi-unit  { font-size: 12px; color: var(--text-secondary); }
@@ -415,7 +376,7 @@
 
 <main>
 
-  <!-- ===== 勉強時間タブ ===== -->
+  <!-- ===== 勉強時間タブ（変更なし） ===== -->
   <div class="tab-panel active" id="panel-study">
     <div class="card">
       <div class="card-title">新しく記録する</div>
@@ -452,15 +413,23 @@
     <div id="studyRecordList"></div>
   </div>
 
-  <!-- ===== 組分けテストタブ ===== -->
+  <!-- ===== 組分けテストタブ（新デザイン） ===== -->
   <div class="tab-panel" id="panel-test">
-    <div class="card">
+    <div class="card" id="testFormCard">
       <div class="card-title">早稲アカ組分けテスト 過去問記録</div>
-      <div class="test-meta-row">
+
+      <!-- 編集中バナー（編集ボタンを押したときだけ表示） -->
+      <div class="edit-mode-banner" id="editModeBanner" style="display:none">
+        ✏️ 編集中です
+        <button class="cancel-edit-btn" onclick="cancelEditTest()">キャンセル</button>
+      </div>
+
+      <!-- テスト共通情報 -->
+      <div class="test-meta-grid">
         <div class="form-group">
           <label>学年</label>
           <select id="testGradeInput">
-            <option value="">選択してください</option>
+            <option value="">選択</option>
             <option value="小3">小3</option>
             <option value="小4">小4</option>
             <option value="小5">小5</option>
@@ -473,7 +442,7 @@
         <div class="form-group">
           <label>第何回</label>
           <select id="testRoundInput">
-            <option value="">選択してください</option>
+            <option value="">選択</option>
             <option value="第1回">第1回</option>
             <option value="第2回">第2回</option>
             <option value="第3回">第3回</option>
@@ -482,33 +451,141 @@
             <option value="第6回">第6回</option>
           </select>
         </div>
-        <div class="form-group" style="grid-column: 1 / -1;">
+        <div class="form-group" style="grid-column:1/-1">
           <label>出題年度</label>
           <input type="number" id="testYearInput" min="2000" max="2099" placeholder="2024" />
         </div>
-      </div>
-      <div class="form-group">
-        <label>実施日</label>
-        <input type="date" id="testDateInput" />
-      </div>
-      <div class="form-group">
-        <label>教科</label>
-        <div class="test-subject-row">
-          <button class="test-subject-btn active" data-key="kokugo" onclick="selectTestSubject(this)">📖 国語</button>
-          <button class="test-subject-btn" data-key="sansu"  onclick="selectTestSubject(this)">🔢 算数</button>
-          <button class="test-subject-btn" data-key="rika"   onclick="selectTestSubject(this)">🔬 理科</button>
-          <button class="test-subject-btn" data-key="shakai" onclick="selectTestSubject(this)">🌍 社会</button>
+        <div class="form-group" style="grid-column:1/-1">
+          <label>実施日</label>
+          <input type="date" id="testDateInput" />
         </div>
       </div>
-      <div class="form-group">
-        <label>点数</label>
-        <div class="score-entry-row">
-          <input type="number" id="testScoreInput" min="0" max="999" placeholder="85" />
-          <span class="score-entry-unit">点</span>
+
+      <!-- 教科別入力（4教科。受けていない教科は空欄でOK） -->
+      <span class="subject-sections-label">教科別の記録（受けていない教科は空欄でOK）</span>
+
+      <!-- 国語 -->
+      <div class="subject-section">
+        <div class="subject-section-header">📖 国語</div>
+        <div class="subject-input-grid">
+          <div>
+            <span class="sic-label">点数</span>
+            <input type="number" class="sic-input" id="score_kokugo" min="0" max="999" placeholder="－" oninput="calcTotalScore()" />
+          </div>
+          <div>
+            <span class="sic-label">偏差値</span>
+            <input type="number" class="sic-input" id="deviation_kokugo" min="0" max="99" step="0.1" placeholder="－" />
+          </div>
+          <div>
+            <span class="sic-label">平均点</span>
+            <input type="number" class="sic-input" id="average_kokugo" min="0" max="999" step="0.1" placeholder="－" />
+          </div>
+        </div>
+        <div class="review-row">
+          <label class="review-cb-label">
+            <input type="checkbox" id="reviewed_kokugo" onchange="toggleReviewDate('kokugo')" />
+            解き直し済み
+          </label>
+          <input type="date" class="review-date-inp" id="reviewDate_kokugo" style="display:none" />
         </div>
       </div>
-      <button class="btn btn-primary" onclick="addTestEntry()">登録する</button>
+
+      <!-- 算数 -->
+      <div class="subject-section">
+        <div class="subject-section-header">🔢 算数</div>
+        <div class="subject-input-grid">
+          <div>
+            <span class="sic-label">点数</span>
+            <input type="number" class="sic-input" id="score_sansu" min="0" max="999" placeholder="－" oninput="calcTotalScore()" />
+          </div>
+          <div>
+            <span class="sic-label">偏差値</span>
+            <input type="number" class="sic-input" id="deviation_sansu" min="0" max="99" step="0.1" placeholder="－" />
+          </div>
+          <div>
+            <span class="sic-label">平均点</span>
+            <input type="number" class="sic-input" id="average_sansu" min="0" max="999" step="0.1" placeholder="－" />
+          </div>
+        </div>
+        <div class="review-row">
+          <label class="review-cb-label">
+            <input type="checkbox" id="reviewed_sansu" onchange="toggleReviewDate('sansu')" />
+            解き直し済み
+          </label>
+          <input type="date" class="review-date-inp" id="reviewDate_sansu" style="display:none" />
+        </div>
+      </div>
+
+      <!-- 理科 -->
+      <div class="subject-section">
+        <div class="subject-section-header">🔬 理科</div>
+        <div class="subject-input-grid">
+          <div>
+            <span class="sic-label">点数</span>
+            <input type="number" class="sic-input" id="score_rika" min="0" max="999" placeholder="－" oninput="calcTotalScore()" />
+          </div>
+          <div>
+            <span class="sic-label">偏差値</span>
+            <input type="number" class="sic-input" id="deviation_rika" min="0" max="99" step="0.1" placeholder="－" />
+          </div>
+          <div>
+            <span class="sic-label">平均点</span>
+            <input type="number" class="sic-input" id="average_rika" min="0" max="999" step="0.1" placeholder="－" />
+          </div>
+        </div>
+        <div class="review-row">
+          <label class="review-cb-label">
+            <input type="checkbox" id="reviewed_rika" onchange="toggleReviewDate('rika')" />
+            解き直し済み
+          </label>
+          <input type="date" class="review-date-inp" id="reviewDate_rika" style="display:none" />
+        </div>
+      </div>
+
+      <!-- 社会 -->
+      <div class="subject-section">
+        <div class="subject-section-header">🌍 社会</div>
+        <div class="subject-input-grid">
+          <div>
+            <span class="sic-label">点数</span>
+            <input type="number" class="sic-input" id="score_shakai" min="0" max="999" placeholder="－" oninput="calcTotalScore()" />
+          </div>
+          <div>
+            <span class="sic-label">偏差値</span>
+            <input type="number" class="sic-input" id="deviation_shakai" min="0" max="99" step="0.1" placeholder="－" />
+          </div>
+          <div>
+            <span class="sic-label">平均点</span>
+            <input type="number" class="sic-input" id="average_shakai" min="0" max="999" step="0.1" placeholder="－" />
+          </div>
+        </div>
+        <div class="review-row">
+          <label class="review-cb-label">
+            <input type="checkbox" id="reviewed_shakai" onchange="toggleReviewDate('shakai')" />
+            解き直し済み
+          </label>
+          <input type="date" class="review-date-inp" id="reviewDate_shakai" style="display:none" />
+        </div>
+      </div>
+
+      <!-- 総合 -->
+      <div class="form-group">
+        <label>総合</label>
+        <div class="total-section">
+          <div class="total-auto">
+            <div class="total-auto-label">合計点（自動計算）</div>
+            <div class="total-auto-value" id="totalScoreDisplay">－</div>
+          </div>
+          <div class="total-dev-wrap">
+            <span class="total-dev-label">総合偏差値（手入力）</span>
+            <input type="number" id="totalDeviationInput" min="0" max="99" step="0.1" placeholder="－" style="margin-top:0" />
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" id="testSubmitBtn" onclick="addOrUpdateTestEntry()">登録する</button>
     </div>
+
     <div class="section-header">
       <div class="section-title">テスト一覧</div>
       <div class="total-badge" id="testTotalBadge"></div>
@@ -519,13 +596,13 @@
   <!-- ===== ダッシュボードタブ ===== -->
   <div class="tab-panel" id="panel-dash">
 
-    <!-- KPI -->
+    <!-- KPI まとめ -->
     <div class="card">
       <div class="card-title">📋 まとめ</div>
       <div class="kpi-row" id="dashKpi"></div>
     </div>
 
-    <!-- グラフ1：点数の推移 -->
+    <!-- グラフ①：点数の推移 -->
     <div class="card">
       <div class="card-title">📈 テストの点数推移</div>
       <div class="chart-legend">
@@ -534,18 +611,29 @@
         <span class="legend-item"><span class="legend-dot" style="background:var(--c-rika)"></span>理科</span>
         <span class="legend-item"><span class="legend-dot" style="background:var(--c-shakai)"></span>社会</span>
       </div>
-      <div id="scoreChartWrap">
-        <div class="chart-wrap"><canvas id="chartScore"></canvas></div>
-      </div>
+      <div id="scoreChartWrap"><div class="chart-wrap"><canvas id="chartScore"></canvas></div></div>
     </div>
 
-    <!-- グラフ2：解き直し進捗 -->
+    <!-- グラフ②：偏差値の推移（新規追加） -->
+    <div class="card">
+      <div class="card-title">📐 偏差値の推移</div>
+      <div class="chart-legend">
+        <span class="legend-item"><span class="legend-dot" style="background:var(--c-kokugo)"></span>国語</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--c-sansu)"></span>算数</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--c-rika)"></span>理科</span>
+        <span class="legend-item"><span class="legend-dot" style="background:var(--c-shakai)"></span>社会</span>
+        <span class="legend-item"><span class="legend-dash" style="border-color:var(--c-total)"></span>総合</span>
+      </div>
+      <div id="deviationChartWrap"><div class="chart-wrap"><canvas id="chartDeviation"></canvas></div></div>
+    </div>
+
+    <!-- グラフ③：解き直し進捗 -->
     <div class="card">
       <div class="card-title">✅ 解き直し進捗</div>
       <div id="reviewProgressWrap"></div>
     </div>
 
-    <!-- グラフ3：勉強時間の推移 -->
+    <!-- グラフ④：勉強時間の推移 -->
     <div class="card">
       <div class="card-title">⏱ 勉強時間の推移</div>
       <div class="chart-legend">
@@ -555,9 +643,7 @@
         <span class="legend-item"><span class="legend-dot" style="background:var(--c-shakai)"></span>社会</span>
         <span class="legend-item"><span class="legend-dot" style="background:#b197fc"></span>その他</span>
       </div>
-      <div id="studyChartWrap">
-        <div class="chart-wrap"><canvas id="chartStudy"></canvas></div>
-      </div>
+      <div id="studyChartWrap"><div class="chart-wrap"><canvas id="chartStudy"></canvas></div></div>
     </div>
 
   </div><!-- /panel-dash -->
@@ -576,9 +662,7 @@ const TEST_SUBJECTS = [
 ];
 const SUBJECT_EMOJI  = { '国語':'📖', '算数':'🔢', '理科':'🔬', '社会':'🌍' };
 const SUBJECT_COLORS = { '国語':'#fff3e0', '算数':'#e3f2fd', '理科':'#e8f5e9', '社会':'#fce4ec' };
-const STUDY_SUBJECT_COLORS = {
-  '国語':'#ff6b6b', '算数':'#4b9eff', '理科':'#51cf66', '社会':'#ffa94d',
-};
+const STUDY_SUBJECT_COLORS = { '国語':'#ff6b6b', '算数':'#4b9eff', '理科':'#51cf66', '社会':'#ffa94d' };
 
 // =====================================================
 //  ユーティリティ
@@ -595,6 +679,11 @@ function formatDate(s) {
 function formatDateShort(s) {
   const [, m, d] = s.split('-').map(Number);
   return `${m}/${d}`;
+}
+// 文字列 → 数値。空欄やNaNはnullに変換する
+function parseNum(val) {
+  const n = parseFloat(val);
+  return isNaN(n) ? null : n;
 }
 
 // =====================================================
@@ -627,12 +716,11 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('panel-' + tab).classList.add('active');
-  // ダッシュボードタブを開いたときにグラフを描画する
   if (tab === 'dash') renderDashboard();
 }
 
 // =====================================================
-//  勉強時間タブ
+//  勉強時間タブ（変更なし）
 // =====================================================
 function loadStudyData() { return JSON.parse(localStorage.getItem('studyRecords') || '[]'); }
 function saveStudyData(d) { localStorage.setItem('studyRecords', JSON.stringify(d)); }
@@ -652,7 +740,7 @@ function addStudyRecord() {
   const subject = selectedSubject === 'その他'
     ? (document.getElementById('customSubjectInput').value.trim() || 'その他')
     : selectedSubject;
-  if (!date)            { alert('日付を入れてください'); return; }
+  if (!date)                { alert('日付を入れてください'); return; }
   if (!minutes || minutes < 1) { alert('時間（分）を入れてください'); return; }
   const records = loadStudyData();
   records.push({ id: Date.now(), date, subject, minutes });
@@ -681,9 +769,7 @@ function renderStudyRecords() {
   }
   container.innerHTML = `<div class="record-list-gap">` + records.map(r => `
     <div class="study-record-item">
-      <div class="record-subject-dot" style="background:${SUBJECT_COLORS[r.subject]||'#f3e5f5'}">
-        ${SUBJECT_EMOJI[r.subject]||'✏️'}
-      </div>
+      <div class="record-subject-dot" style="background:${SUBJECT_COLORS[r.subject]||'#f3e5f5'}">${SUBJECT_EMOJI[r.subject]||'✏️'}</div>
       <div class="record-info">
         <div class="record-subject-name">${r.subject}</div>
         <div class="record-date">${formatDate(r.date)}</div>
@@ -694,176 +780,276 @@ function renderStudyRecords() {
 }
 
 // =====================================================
-//  組分けテストタブ
+//  組分けテストタブ（新形式）
 // =====================================================
+/*
+  新しいデータ構造（testEntries）:
+  [{
+    id: number,
+    grade: string,           // "小5"
+    round: string,           // "第3回"
+    year: string,            // "2024"
+    date: string,            // "YYYY-MM-DD"
+    subjects: {
+      kokugo: { score: number|null, deviation: number|null, average: number|null,
+                reviewed: boolean, reviewDate: string|null },
+      sansu:  { ... },
+      rika:   { ... },
+      shakai: { ... },
+    },
+    totalDeviation: number|null,  // 総合偏差値
+  }]
+*/
+
 function loadTestData() { return JSON.parse(localStorage.getItem('testEntries') || '[]'); }
 function saveTestData(d) { localStorage.setItem('testEntries', JSON.stringify(d)); }
 
-let selectedTestSubjectKey = 'kokugo';
-function selectTestSubject(btn) {
-  document.querySelectorAll('.test-subject-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  selectedTestSubjectKey = btn.dataset.key;
+// 旧形式（1エントリ＝1教科）のデータが残っていたら自動で消去する
+function migrateTestData() {
+  const data = JSON.parse(localStorage.getItem('testEntries') || '[]');
+  if (data.length > 0 && data[0].subjectKey !== undefined) {
+    localStorage.removeItem('testEntries');
+  }
 }
 
-function addTestEntry() {
+// 「解き直した日」の入力欄を表示・非表示する
+function toggleReviewDate(key) {
+  const cb   = document.getElementById('reviewed_' + key);
+  const inp  = document.getElementById('reviewDate_' + key);
+  inp.style.display = cb.checked ? 'inline-block' : 'none';
+  if (cb.checked && !inp.value) inp.value = todayString();
+}
+
+// 点数が入力されるたびに合計点を自動計算して表示する
+function calcTotalScore() {
+  let total = 0, count = 0;
+  for (const s of TEST_SUBJECTS) {
+    const v = parseNum(document.getElementById('score_' + s.key).value);
+    if (v !== null) { total += v; count++; }
+  }
+  document.getElementById('totalScoreDisplay').textContent = count > 0 ? total + '点' : '－';
+}
+
+// フォームから1教科分のデータを読み取る
+function getSubjectInputs(key) {
+  return {
+    score:      parseNum(document.getElementById('score_'      + key).value),
+    deviation:  parseNum(document.getElementById('deviation_'  + key).value),
+    average:    parseNum(document.getElementById('average_'    + key).value),
+    reviewed:   document.getElementById('reviewed_'   + key).checked,
+    reviewDate: document.getElementById('reviewDate_' + key).value || null,
+  };
+}
+
+let editingTestId = null;  // 編集中のレコードIDを覚えておく変数
+
+function addOrUpdateTestEntry() {
   const grade = document.getElementById('testGradeInput').value;
   const round = document.getElementById('testRoundInput').value;
   const year  = document.getElementById('testYearInput').value.trim();
   const date  = document.getElementById('testDateInput').value;
-  const score = document.getElementById('testScoreInput').value;
   if (!grade) { alert('学年を選んでください'); return; }
   if (!round) { alert('第何回かを選んでください'); return; }
   if (!year)  { alert('出題年度を入力してください'); return; }
   if (!date)  { alert('実施日を入れてください'); return; }
-  if (score === '') { alert('点数を入力してください'); return; }
-  const entries = loadTestData();
-  const existIdx = entries.findIndex(
-    e => e.grade === grade && e.round === round && e.year === year && e.subjectKey === selectedTestSubjectKey
-  );
-  const prev = existIdx >= 0 ? entries[existIdx] : {};
-  const newEntry = {
-    id: existIdx >= 0 ? prev.id : Date.now(),
-    grade, round, year, date,
-    subjectKey: selectedTestSubjectKey,
-    score: parseInt(score, 10),
-    reviewed:   prev.reviewed   || false,
-    reviewDate: prev.reviewDate || null,
-  };
-  if (existIdx >= 0) { entries[existIdx] = newEntry; }
-  else               { entries.push(newEntry); }
-  saveTestData(entries);
-  document.getElementById('testScoreInput').value = '';
-  renderTestRecords();
-}
 
-function toggleReview(grade, round, year, subjectKey, checked) {
-  const entries = loadTestData();
-  const idx = entries.findIndex(
-    e => e.grade === grade && e.round === round && e.year === year && e.subjectKey === subjectKey
-  );
-  if (idx < 0) return;
-  entries[idx].reviewed   = checked;
-  entries[idx].reviewDate = checked ? todayString() : null;
-  saveTestData(entries);
-  renderTestRecords();
-}
-
-function saveReviewDate(grade, round, year, subjectKey, dateVal) {
-  const entries = loadTestData();
-  const idx = entries.findIndex(
-    e => e.grade === grade && e.round === round && e.year === year && e.subjectKey === subjectKey
-  );
-  if (idx < 0) return;
-  entries[idx].reviewDate = dateVal || null;
-  saveTestData(entries);
-}
-
-function deleteTestGroup(grade, round, year) {
-  saveTestData(loadTestData().filter(e => !(e.grade === grade && e.round === round && e.year === year)));
-  renderTestRecords();
-}
-
-// テストデータをグループ（回ごと）にまとめて返す共通関数
-// ダッシュボードでも使う
-function getTestGroups() {
-  const entries = loadTestData();
-  const groups = {};
-  for (const e of entries) {
-    const key = `${e.grade}__${e.round}__${e.year}`;
-    if (!groups[key]) groups[key] = { grade: e.grade || '', round: e.round, year: e.year, date: e.date, subjects: {} };
-    groups[key].subjects[e.subjectKey] = { score: e.score, reviewed: e.reviewed || false, reviewDate: e.reviewDate || null };
-    if (e.date > groups[key].date) groups[key].date = e.date;
+  // 全教科のデータが空欄かチェック
+  const subjects = {};
+  let hasAnyData = false;
+  for (const s of TEST_SUBJECTS) {
+    const sub = getSubjectInputs(s.key);
+    subjects[s.key] = sub;
+    if (sub.score !== null || sub.deviation !== null || sub.average !== null) hasAnyData = true;
   }
-  return Object.values(groups).sort((a, b) => a.date.localeCompare(b.date));
+  if (!hasAnyData) { alert('少なくとも1教科の点数・偏差値・平均点のどれかを入力してください'); return; }
+
+  const totalDeviation = parseNum(document.getElementById('totalDeviationInput').value);
+  const entry = {
+    id: editingTestId || Date.now(),
+    grade, round, year, date, subjects, totalDeviation,
+  };
+
+  const entries = loadTestData();
+  if (editingTestId) {
+    const idx = entries.findIndex(e => e.id === editingTestId);
+    if (idx >= 0) entries[idx] = entry; else entries.push(entry);
+    cancelEditTest();
+  } else {
+    entries.push(entry);
+  }
+  saveTestData(entries);
+  clearTestForm();
+  renderTestRecords();
+}
+
+// フォームを空にする
+function clearTestForm() {
+  document.getElementById('testYearInput').value  = '';
+  document.getElementById('testDateInput').value  = todayString();
+  document.getElementById('totalDeviationInput').value = '';
+  document.getElementById('totalScoreDisplay').textContent = '－';
+  for (const s of TEST_SUBJECTS) {
+    document.getElementById('score_'      + s.key).value = '';
+    document.getElementById('deviation_'  + s.key).value = '';
+    document.getElementById('average_'    + s.key).value = '';
+    document.getElementById('reviewed_'   + s.key).checked = false;
+    document.getElementById('reviewDate_' + s.key).value   = '';
+    document.getElementById('reviewDate_' + s.key).style.display = 'none';
+  }
+}
+
+// 削除
+function deleteTestEntry(id) {
+  if (!confirm('このテスト記録を削除しますか？')) return;
+  saveTestData(loadTestData().filter(e => e.id !== id));
+  if (editingTestId === id) cancelEditTest();
+  renderTestRecords();
+}
+
+// 編集ボタンを押したときにフォームへデータをセットする
+function editTestEntry(id) {
+  const entry = loadTestData().find(e => e.id === id);
+  if (!entry) return;
+  editingTestId = id;
+  document.getElementById('testGradeInput').value = entry.grade;
+  document.getElementById('testRoundInput').value = entry.round;
+  document.getElementById('testYearInput').value  = entry.year;
+  document.getElementById('testDateInput').value  = entry.date;
+  for (const s of TEST_SUBJECTS) {
+    const sub = entry.subjects[s.key] || {};
+    document.getElementById('score_'      + s.key).value   = sub.score      ?? '';
+    document.getElementById('deviation_'  + s.key).value   = sub.deviation  ?? '';
+    document.getElementById('average_'    + s.key).value   = sub.average    ?? '';
+    document.getElementById('reviewed_'   + s.key).checked = sub.reviewed   || false;
+    document.getElementById('reviewDate_' + s.key).value   = sub.reviewDate || '';
+    document.getElementById('reviewDate_' + s.key).style.display = sub.reviewed ? 'inline-block' : 'none';
+  }
+  document.getElementById('totalDeviationInput').value = entry.totalDeviation ?? '';
+  calcTotalScore();
+  document.getElementById('editModeBanner').style.display  = 'flex';
+  document.getElementById('testSubmitBtn').textContent     = '✏️ 更新する';
+  // フォームの先頭までスクロール
+  document.getElementById('testFormCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// 編集をキャンセルする
+function cancelEditTest() {
+  editingTestId = null;
+  document.getElementById('editModeBanner').style.display = 'none';
+  document.getElementById('testSubmitBtn').textContent    = '登録する';
+  clearTestForm();
+}
+
+// ダッシュボードでも使う共通関数：実施日の古い順で全テストを返す
+function getTestGroups() {
+  return loadTestData().slice().sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function renderTestRecords() {
-  const sorted = getTestGroups().slice().reverse(); // 一覧は新しい順
+  // 一覧は新しい順に並べる
+  const entries = loadTestData().slice().sort((a, b) => b.date.localeCompare(a.date));
   const container = document.getElementById('testRecordList');
-  const totalEl   = document.getElementById('testTotalBadge');
-  totalEl.textContent = sorted.length > 0 ? `${sorted.length}件` : '';
-  if (!sorted.length) {
+  document.getElementById('testTotalBadge').textContent = entries.length > 0 ? `${entries.length}件` : '';
+
+  if (!entries.length) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-emoji">🏆</div><p>まだテスト記録がありません。<br>上のフォームから登録してみよう！</p></div>`;
     return;
   }
-  container.innerHTML = sorted.map(g => {
-    const cells = TEST_SUBJECTS.map(s => {
-      const entry = g.subjects[s.key];
-      if (!entry) return `
-        <div class="test-score-cell">
-          <div class="test-score-cell-subject">${s.emoji} ${s.label}</div>
-          <div class="test-score-cell-value no-score">－</div>
-        </div>`;
-      const { score, reviewed, reviewDate } = entry;
-      const attrs = `data-grade="${g.grade}" data-round="${g.round}" data-year="${g.year}" data-skey="${s.key}"`;
-      const dateInput = reviewed ? `
-        <input type="date" class="review-card-date" value="${reviewDate || ''}"
-          ${attrs} onchange="saveReviewDate(this.dataset.grade,this.dataset.round,this.dataset.year,this.dataset.skey,this.value)" />` : '';
-      return `
-        <div class="test-score-cell">
-          <div class="test-score-cell-subject">${s.emoji} ${s.label}</div>
-          <div class="test-score-cell-value">${score}</div>
-          <div class="test-score-cell-unit">点</div>
-          <label class="review-card-check-label">
-            <input type="checkbox" ${reviewed ? 'checked' : ''} ${attrs}
-              onchange="toggleReview(this.dataset.grade,this.dataset.round,this.dataset.year,this.dataset.skey,this.checked)" />
-            <span>${reviewed ? '✅ 済' : '未'}</span>
-          </label>
-          ${dateInput}
-        </div>`;
+
+  container.innerHTML = entries.map(e => {
+    // 合計点を計算
+    let totalScore = 0, scoreCount = 0;
+    for (const s of TEST_SUBJECTS) {
+      const sub = e.subjects[s.key];
+      if (sub && sub.score !== null) { totalScore += sub.score; scoreCount++; }
+    }
+
+    // 教科ごとの行を作る
+    const subjectRows = TEST_SUBJECTS.map(s => {
+      const sub = e.subjects[s.key] || {};
+      const hasData = sub.score !== null || sub.deviation !== null || sub.average !== null;
+      if (!hasData) return `<tr>
+        <td class="tc-sub">${s.emoji} ${s.label}</td>
+        <td class="tc-empty">－</td><td class="tc-empty">－</td>
+        <td class="tc-empty">－</td><td class="tc-empty">－</td>
+      </tr>`;
+      const revCell = sub.reviewed
+        ? `<span class="rev-badge">✅${sub.reviewDate ? ' ' + sub.reviewDate.slice(5).replace('-','/') : ' 済'}</span>`
+        : `<span class="rev-none">未</span>`;
+      return `<tr>
+        <td class="tc-sub">${s.emoji} ${s.label}</td>
+        <td class="tc-score">${sub.score      !== null ? sub.score+'点'  : '<span class="tc-empty">－</span>'}</td>
+        <td class="tc-dev"  >${sub.deviation  !== null ? sub.deviation   : '<span class="tc-empty">－</span>'}</td>
+        <td class="tc-avg"  >${sub.average    !== null ? sub.average+'点': '<span class="tc-empty">－</span>'}</td>
+        <td>${revCell}</td>
+      </tr>`;
     }).join('');
-    return `
-      <div class="test-card">
-        <div class="test-card-header">
-          <div>
-            <div class="test-card-title-row">
-              ${g.grade ? `<span class="test-card-grade">${g.grade}</span>` : ''}
-              <span class="test-card-round">${g.round}</span>
-              <span class="test-card-year">${g.year}年</span>
-            </div>
-            <div class="test-card-date">${formatDate(g.date)}</div>
+
+    return `<div class="test-card">
+      <div class="test-card-header">
+        <div>
+          <div class="test-card-title-row">
+            ${e.grade ? `<span class="test-card-grade">${e.grade}</span>` : ''}
+            <span class="test-card-round">${e.round}</span>
+            <span class="test-card-year">${e.year}年</span>
           </div>
-          <button class="delete-btn" data-grade="${g.grade}" data-round="${g.round}" data-year="${g.year}"
-            onclick="deleteTestGroup(this.dataset.grade,this.dataset.round,this.dataset.year)">🗑</button>
+          <div class="test-card-date">${formatDate(e.date)}</div>
         </div>
-        <div class="test-score-grid">${cells}</div>
-      </div>`;
+        <div class="card-btns">
+          <button class="edit-btn"   onclick="editTestEntry(${e.id})">✏️</button>
+          <button class="delete-btn" onclick="deleteTestEntry(${e.id})">🗑</button>
+        </div>
+      </div>
+      <table class="tc-table">
+        <thead>
+          <tr>
+            <th>教科</th><th>点数</th><th>偏差値</th><th>平均点</th><th>解き直し</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${subjectRows}
+          <tr class="tc-total">
+            <td class="tc-sub">🏆 総合</td>
+            <td class="tc-score">${scoreCount > 0 ? totalScore+'点' : '<span class="tc-empty">－</span>'}</td>
+            <td class="tc-dev">${e.totalDeviation !== null && e.totalDeviation !== undefined ? e.totalDeviation : '<span class="tc-empty">－</span>'}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>`;
   }).join('');
 }
 
 // =====================================================
 //  ダッシュボード
 // =====================================================
-// Chart.js のインスタンスを保持しておく変数
-// （タブを切り替えるたびに再描画するため、古いグラフを破棄する必要がある）
-let chartScoreInstance = null;
-let chartStudyInstance = null;
-let chartDonutInstance = null;
+let chartScoreInstance     = null;
+let chartDeviationInstance = null;
+let chartStudyInstance     = null;
+let chartDonutInstance     = null;
 
-// Chart.js のデフォルト設定（日本語フォントに合わせる）
 Chart.defaults.font.family = "-apple-system, 'Hiragino Sans', sans-serif";
 Chart.defaults.color = '#6c6c70';
 
 function renderDashboard() {
   renderKpi();
   renderScoreChart();
+  renderDeviationChart();
   renderReviewProgress();
   renderStudyChart();
 }
 
 // ── KPI タイル ──
 function renderKpi() {
-  const testEntries  = loadTestData();
+  const entries      = loadTestData();
   const studyRecords = loadStudyData();
   const totalStudy   = studyRecords.reduce((s, r) => s + r.minutes, 0);
   const h = Math.floor(totalStudy / 60), m = totalStudy % 60;
-  const groups = getTestGroups();
 
   document.getElementById('dashKpi').innerHTML = `
     <div class="kpi-tile">
       <div class="kpi-label">テスト記録</div>
-      <div class="kpi-value">${groups.length}<span class="kpi-unit"> 回</span></div>
+      <div class="kpi-value">${entries.length}<span class="kpi-unit"> 回</span></div>
     </div>
     <div class="kpi-tile">
       <div class="kpi-label">勉強時間（合計）</div>
@@ -871,95 +1057,128 @@ function renderKpi() {
     </div>`;
 }
 
-// ── グラフ1：点数推移（折れ線） ──
+// ── グラフ①：点数推移（折れ線）──
 function renderScoreChart() {
-  const groups = getTestGroups(); // 実施日の古い順
-
-  if (groups.length === 0) {
+  const groups = getTestGroups();
+  if (!groups.length) {
     document.getElementById('scoreChartWrap').innerHTML =
       `<div class="empty-state" style="padding:24px 0"><div class="empty-state-emoji">📊</div><p>テスト記録を追加すると<br>点数の推移が表示されます</p></div>`;
     return;
   }
-
-  // X軸ラベル：「小5 第3回」のような形式
-  const labels = groups.map(g => `${g.grade ? g.grade+' ' : ''}${g.round}`);
-
-  // 4教科ごとにデータを作る（点数がない回は null にする → グラフが途切れる）
+  const labels   = groups.map(g => `${g.grade ? g.grade+' ' : ''}${g.round}`);
   const datasets = TEST_SUBJECTS.map(s => ({
     label: s.label,
-    data: groups.map(g => g.subjects[s.key] ? g.subjects[s.key].score : null),
-    borderColor: s.color,
-    backgroundColor: s.color + '22', // 半透明の塗りつぶし
-    pointBackgroundColor: s.color,
-    pointRadius: 5,
-    pointHoverRadius: 7,
-    tension: 0.3, // 線を少し丸くする
-    spanGaps: false, // 空白の回は線を繋げない
+    data: groups.map(g => {
+      const sub = g.subjects[s.key];
+      return (sub && sub.score !== null) ? sub.score : null;
+    }),
+    borderColor: s.color, backgroundColor: s.color+'22',
+    pointBackgroundColor: s.color, pointRadius: 5, pointHoverRadius: 7,
+    tension: 0.3, spanGaps: false,
   }));
 
-  // 既存のグラフがあれば破棄してから新しく作る
   if (chartScoreInstance) { chartScoreInstance.destroy(); chartScoreInstance = null; }
-
-  // グラフがある場合はキャンバスを復元
   document.getElementById('scoreChartWrap').innerHTML = `<div class="chart-wrap"><canvas id="chartScore"></canvas></div>`;
-
   chartScoreInstance = new Chart(document.getElementById('chartScore'), {
-    type: 'line',
-    data: { labels, datasets },
+    type: 'line', data: { labels, datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: true,
+      responsive: true, maintainAspectRatio: true,
       interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: { display: false }, // 凡例はHTMLで表示しているので非表示
-        tooltip: {
-          callbacks: {
-            label: ctx => ctx.parsed.y !== null ? `${ctx.dataset.label}: ${ctx.parsed.y}点` : null,
-          }
-        }
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y !== null ? `${ctx.dataset.label}: ${ctx.parsed.y}点` : null } }
       },
       scales: {
-        y: {
-          beginAtZero: false,
-          suggestedMin: 0,
-          suggestedMax: 150,
-          ticks: { stepSize: 25 },
-          grid: { color: '#f0f0f0' },
-        },
-        x: {
-          grid: { display: false },
-          ticks: { font: { size: 11 } },
-        }
+        y: { beginAtZero: false, suggestedMin: 0, suggestedMax: 150, ticks: { stepSize: 25 }, grid: { color: '#f0f0f0' } },
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } }
       }
     }
   });
 }
 
-// ── グラフ2：解き直し進捗 ──
+// ── グラフ②：偏差値推移（折れ線）── ※新規追加
+function renderDeviationChart() {
+  const groups = getTestGroups();
+  if (!groups.length) {
+    document.getElementById('deviationChartWrap').innerHTML =
+      `<div class="empty-state" style="padding:24px 0"><div class="empty-state-emoji">📐</div><p>テスト記録を追加すると<br>偏差値の推移が表示されます</p></div>`;
+    return;
+  }
+  const labels = groups.map(g => `${g.grade ? g.grade+' ' : ''}${g.round}`);
+
+  // 4教科の偏差値ライン
+  const datasets = TEST_SUBJECTS.map(s => ({
+    label: s.label,
+    data: groups.map(g => {
+      const sub = g.subjects[s.key];
+      return (sub && sub.deviation !== null) ? sub.deviation : null;
+    }),
+    borderColor: s.color, backgroundColor: s.color+'22',
+    pointBackgroundColor: s.color, pointRadius: 5, pointHoverRadius: 7,
+    tension: 0.3, spanGaps: false,
+  }));
+
+  // 総合偏差値（破線で表示）
+  datasets.push({
+    label: '総合',
+    data: groups.map(g => (g.totalDeviation !== null && g.totalDeviation !== undefined) ? g.totalDeviation : null),
+    borderColor: '#ae3ec9', backgroundColor: '#ae3ec922',
+    pointBackgroundColor: '#ae3ec9', pointRadius: 6, pointHoverRadius: 8,
+    borderWidth: 2.5, borderDash: [6, 3],
+    tension: 0.3, spanGaps: false,
+  });
+
+  if (chartDeviationInstance) { chartDeviationInstance.destroy(); chartDeviationInstance = null; }
+  document.getElementById('deviationChartWrap').innerHTML = `<div class="chart-wrap"><canvas id="chartDeviation"></canvas></div>`;
+  chartDeviationInstance = new Chart(document.getElementById('chartDeviation'), {
+    type: 'line', data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y !== null ? `${ctx.dataset.label}: ${ctx.parsed.y}` : null } }
+      },
+      scales: {
+        y: {
+          beginAtZero: false, suggestedMin: 30, suggestedMax: 75,
+          ticks: { stepSize: 10 }, grid: { color: '#f0f0f0' },
+        },
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ── グラフ③：解き直し進捗（ドーナツ＋バー）──
 function renderReviewProgress() {
   const entries = loadTestData();
-  const wrap = document.getElementById('reviewProgressWrap');
-
-  if (entries.length === 0) {
+  const wrap    = document.getElementById('reviewProgressWrap');
+  if (!entries.length) {
     wrap.innerHTML = `<div class="empty-state" style="padding:24px 0"><div class="empty-state-emoji">✅</div><p>テスト記録を追加すると<br>解き直しの進捗が表示されます</p></div>`;
     if (chartDonutInstance) { chartDonutInstance.destroy(); chartDonutInstance = null; }
     return;
   }
 
-  // 全体の解き直し済み数・未数
-  const total    = entries.length;
-  const done     = entries.filter(e => e.reviewed).length;
-  const notDone  = total - done;
-  const pct      = Math.round(done / total * 100);
-
-  // 教科ごとの集計
+  // 点数が入力された教科だけを「解き直し対象」としてカウント
+  let totalReviewable = 0, totalDone = 0;
   const perSubject = TEST_SUBJECTS.map(s => {
-    const sEntries = entries.filter(e => e.subjectKey === s.key);
-    const sDone    = sEntries.filter(e => e.reviewed).length;
-    return { ...s, total: sEntries.length, done: sDone };
+    let sTotal = 0, sDone = 0;
+    for (const e of entries) {
+      const sub = e.subjects[s.key];
+      if (sub && sub.score !== null) {
+        sTotal++;
+        if (sub.reviewed) sDone++;
+      }
+    }
+    totalReviewable += sTotal;
+    totalDone       += sDone;
+    return { ...s, total: sTotal, done: sDone };
   }).filter(s => s.total > 0);
 
-  // ドーナツ + 教科別バーのHTML
+  const pct     = totalReviewable > 0 ? Math.round(totalDone / totalReviewable * 100) : 0;
+  const notDone = totalReviewable - totalDone;
+
   wrap.innerHTML = `
     <div class="review-progress-wrap">
       <div class="review-donut-wrap">
@@ -972,32 +1191,18 @@ function renderReviewProgress() {
       <div class="review-bars">
         ${perSubject.map(s => {
           const p = s.total > 0 ? Math.round(s.done / s.total * 100) : 0;
-          return `
-            <div class="review-bar-row">
-              <div class="review-bar-label">
-                <span>${s.emoji} ${s.label}</span>
-                <span>${s.done}/${s.total}</span>
-              </div>
-              <div class="review-bar-track">
-                <div class="review-bar-fill" style="width:${p}%;background:${s.color}"></div>
-              </div>
-            </div>`;
+          return `<div>
+            <div class="review-bar-label"><span>${s.emoji} ${s.label}</span><span>${s.done}/${s.total}</span></div>
+            <div class="review-bar-track"><div class="review-bar-fill" style="width:${p}%;background:${s.color}"></div></div>
+          </div>`;
         }).join('')}
       </div>
     </div>`;
 
   if (chartDonutInstance) { chartDonutInstance.destroy(); chartDonutInstance = null; }
-
   chartDonutInstance = new Chart(document.getElementById('chartDonut'), {
     type: 'doughnut',
-    data: {
-      datasets: [{
-        data: [done, notDone],
-        backgroundColor: ['#34c759', '#e5e5ea'],
-        borderWidth: 0,
-        hoverOffset: 4,
-      }]
-    },
+    data: { datasets: [{ data: [totalDone, notDone], backgroundColor: ['#34c759','#e5e5ea'], borderWidth: 0, hoverOffset: 4 }] },
     options: {
       cutout: '72%',
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
@@ -1006,65 +1211,33 @@ function renderReviewProgress() {
   });
 }
 
-// ── グラフ3：勉強時間の推移（積み上げ棒グラフ） ──
+// ── グラフ④：勉強時間の推移（積み上げ棒グラフ、変更なし）──
 function renderStudyChart() {
   const records = loadStudyData();
-
-  if (records.length === 0) {
+  if (!records.length) {
     document.getElementById('studyChartWrap').innerHTML =
       `<div class="empty-state" style="padding:24px 0"><div class="empty-state-emoji">⏱</div><p>勉強時間を記録すると<br>推移グラフが表示されます</p></div>`;
     return;
   }
-
-  // 日付ごと・教科ごとに勉強時間を集計する
-  const dateSet = [...new Set(records.map(r => r.date))].sort();
-
-  // 登録されている教科の種類をすべて集める
+  const dateSet    = [...new Set(records.map(r => r.date))].sort();
   const subjectSet = [...new Set(records.map(r => r.subject))];
-
-  const datasets = subjectSet.map(sub => ({
+  const datasets   = subjectSet.map(sub => ({
     label: sub,
-    data: dateSet.map(d =>
-      records.filter(r => r.date === d && r.subject === sub)
-             .reduce((s, r) => s + r.minutes, 0) || 0
-    ),
+    data: dateSet.map(d => records.filter(r => r.date === d && r.subject === sub).reduce((s, r) => s + r.minutes, 0) || 0),
     backgroundColor: STUDY_SUBJECT_COLORS[sub] || '#b197fc',
-    borderRadius: 4,
-    borderSkipped: false,
+    borderRadius: 4, borderSkipped: false,
   }));
 
   if (chartStudyInstance) { chartStudyInstance.destroy(); chartStudyInstance = null; }
   document.getElementById('studyChartWrap').innerHTML = `<div class="chart-wrap"><canvas id="chartStudy"></canvas></div>`;
-
   chartStudyInstance = new Chart(document.getElementById('chartStudy'), {
-    type: 'bar',
-    data: {
-      labels: dateSet.map(formatDateShort),
-      datasets,
-    },
+    type: 'bar', data: { labels: dateSet.map(formatDateShort), datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}分`,
-          }
-        }
-      },
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}分` } } },
       scales: {
-        x: {
-          stacked: true,
-          grid: { display: false },
-          ticks: { font: { size: 11 } },
-        },
-        y: {
-          stacked: true,
-          beginAtZero: true,
-          ticks: { stepSize: 30 },
-          grid: { color: '#f0f0f0' },
-        }
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { stacked: true, beginAtZero: true, ticks: { stepSize: 30 }, grid: { color: '#f0f0f0' } }
       }
     }
   });
@@ -1073,6 +1246,9 @@ function renderStudyChart() {
 // =====================================================
 //  起動時の処理
 // =====================================================
+// 旧形式のテストデータを自動クリア（ユーザーが「消してOK」と確認済み）
+migrateTestData();
+
 document.getElementById('studyDateInput').value = todayString();
 document.getElementById('testDateInput').value  = todayString();
 
