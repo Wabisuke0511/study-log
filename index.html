@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>勉強きろく</title>
+  <style>
+    :root {
+      --bg: #f2f2f7;
+      --card: #ffffff;
+      --primary: #007aff;
+      --primary-dark: #0051a8;
+      --danger: #ff3b30;
+      --text: #1c1c1e;
+      --text-secondary: #6c6c70;
+      --border: #e5e5ea;
+      --input-bg: #f2f2f7;
+      --subject-bg: #e8f0fe;
+      --subject-text: #1a56cc;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ── ヘッダー ── */
+    header {
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: saturate(180%) blur(20px);
+      -webkit-backdrop-filter: saturate(180%) blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 20px 12px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .app-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .name-display {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 15px;
+      color: var(--text-secondary);
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      transition: background 0.15s;
+    }
+    .name-display:hover { background: var(--border); }
+    .name-display-name {
+      color: var(--primary);
+      font-weight: 600;
+    }
+    .name-edit-icon { font-size: 13px; }
+
+    /* ── 名前登録モーダル ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 20px;
+    }
+    .modal-overlay.hidden { display: none; }
+
+    .modal {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 32px 24px 24px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    .modal-emoji { font-size: 48px; margin-bottom: 12px; }
+
+    .modal h2 {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .modal p {
+      font-size: 15px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .modal input[type="text"] {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 18px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--input-bg);
+      color: var(--text);
+      text-align: center;
+      transition: border-color 0.15s;
+      margin-bottom: 16px;
+    }
+    .modal input[type="text"]:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    /* ── ボタン ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 14px 24px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      width: 100%;
+    }
+    .btn:active { transform: scale(0.97); opacity: 0.85; }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-danger {
+      background: none;
+      color: var(--danger);
+      padding: 8px 12px;
+      width: auto;
+      font-size: 14px;
+      border: 1.5px solid var(--danger);
+      border-radius: var(--radius-sm);
+    }
+    .btn-sm-ghost {
+      background: none;
+      color: var(--text-secondary);
+      padding: 8px 12px;
+      width: auto;
+      font-size: 14px;
+    }
+
+    /* ── メインコンテンツ ── */
+    main {
+      padding: 20px 16px;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    /* ── 記録フォーム ── */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--text);
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    input[type="date"],
+    input[type="number"],
+    input[type="text"].custom-input,
+    select {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 16px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--input-bg);
+      color: var(--text);
+      -webkit-appearance: none;
+      appearance: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+
+    /* 教科セレクター */
+    .subject-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .subject-btn {
+      padding: 8px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      background: none;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: var(--text);
+    }
+    .subject-btn.active {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+    }
+
+    .custom-subject-area {
+      margin-top: 10px;
+      display: none;
+    }
+    .custom-subject-area.show { display: block; }
+
+    /* 時間入力 */
+    .time-input-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .time-input-row input {
+      flex: 1;
+    }
+    .time-unit {
+      font-size: 16px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    /* ── 記録一覧 ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .total-badge {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-secondary);
+    }
+    .empty-state-emoji { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 16px; line-height: 1.6; }
+
+    .record-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .record-item {
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: slideIn 0.2s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .record-subject-dot {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .record-info { flex: 1; min-width: 0; }
+
+    .record-subject-name {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .record-date {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .record-time {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-right: 8px;
+      white-space: nowrap;
+    }
+    .record-time span {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+      color: var(--text-secondary);
+      font-size: 18px;
+      border-radius: 50%;
+      transition: color 0.15s, background 0.15s;
+      flex-shrink: 0;
+    }
+    .delete-btn:hover { color: var(--danger); background: #fff0ef; }
+  </style>
+</head>
+<body>
+
+<!-- 名前登録モーダル -->
+<div class="modal-overlay" id="nameModal">
+  <div class="modal">
+    <div class="modal-emoji">✏️</div>
+    <h2>はじめまして！</h2>
+    <p>勉強する子の名前を<br>教えてください</p>
+    <input type="text" id="nameInput" placeholder="なまえ" maxlength="20" />
+    <button class="btn btn-primary" onclick="saveName()">はじめる</button>
+  </div>
+</div>
+
+<!-- ヘッダー -->
+<header>
+  <div class="header-top">
+    <div class="app-title">📚 勉強きろく</div>
+    <button class="name-display" onclick="openNameModal()" id="nameBtn">
+      <span id="headerName" class="name-display-name"></span>
+      <span class="name-edit-icon">✏️</span>
+    </button>
+  </div>
+</header>
+
+<main>
+
+  <!-- 記録フォーム -->
+  <div class="card">
+    <div class="card-title">新しく記録する</div>
+
+    <!-- 日付 -->
+    <div class="form-group">
+      <label>日付</label>
+      <input type="date" id="dateInput" />
+    </div>
+
+    <!-- 教科 -->
+    <div class="form-group">
+      <label>教科</label>
+      <div class="subject-row" id="subjectRow">
+        <button class="subject-btn active" data-subject="国語" onclick="selectSubject(this)">📖 国語</button>
+        <button class="subject-btn" data-subject="算数" onclick="selectSubject(this)">🔢 算数</button>
+        <button class="subject-btn" data-subject="理科" onclick="selectSubject(this)">🔬 理科</button>
+        <button class="subject-btn" data-subject="社会" onclick="selectSubject(this)">🌍 社会</button>
+        <button class="subject-btn" data-subject="その他" onclick="selectSubject(this)">＋ その他</button>
+      </div>
+      <div class="custom-subject-area" id="customSubjectArea">
+        <input type="text" class="custom-input" id="customSubjectInput" placeholder="教科名を入力（例：英語）" maxlength="20" />
+      </div>
+    </div>
+
+    <!-- 時間 -->
+    <div class="form-group">
+      <label>勉強した時間</label>
+      <div class="time-input-row">
+        <input type="number" id="minutesInput" min="1" max="999" placeholder="30" />
+        <span class="time-unit">分</span>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="addRecord()">記録する</button>
+  </div>
+
+  <!-- 記録一覧 -->
+  <div class="section-header">
+    <div class="section-title">記録一覧</div>
+    <div class="total-badge" id="totalBadge"></div>
+  </div>
+
+  <div id="recordList"></div>
+
+</main>
+
+<script>
+  // ── 教科の絵文字マッピング ──
+  const SUBJECT_EMOJI = {
+    '国語': '📖',
+    '算数': '🔢',
+    '理科': '🔬',
+    '社会': '🌍',
+  };
+  const SUBJECT_COLORS = {
+    '国語': '#fff3e0',
+    '算数': '#e3f2fd',
+    '理科': '#e8f5e9',
+    '社会': '#fce4ec',
+  };
+
+  function getSubjectEmoji(name) {
+    return SUBJECT_EMOJI[name] || '✏️';
+  }
+  function getSubjectColor(name) {
+    return SUBJECT_COLORS[name] || '#f3e5f5';
+  }
+
+  // ── localStorage ──
+  // localStorage（ローカルストレージ）とは：ブラウザに内蔵された小さな保存場所です。
+  // ここに保存したデータはブラウザを閉じても消えません。
+  function loadData() {
+    return JSON.parse(localStorage.getItem('studyRecords') || '[]');
+  }
+  function saveData(records) {
+    localStorage.setItem('studyRecords', JSON.stringify(records));
+  }
+  function loadName() {
+    return localStorage.getItem('childName') || '';
+  }
+  function saveName() {
+    const val = document.getElementById('nameInput').value.trim();
+    if (!val) {
+      document.getElementById('nameInput').focus();
+      return;
+    }
+    localStorage.setItem('childName', val);
+    document.getElementById('nameModal').classList.add('hidden');
+    updateHeader();
+  }
+
+  // ── ヘッダー更新 ──
+  function updateHeader() {
+    const name = loadName();
+    document.getElementById('headerName').textContent = name ? name + 'ちゃん' : '名前を設定';
+  }
+
+  function openNameModal() {
+    const modal = document.getElementById('nameModal');
+    modal.classList.remove('hidden');
+    document.getElementById('nameInput').value = loadName();
+    document.getElementById('nameInput').focus();
+  }
+
+  // Enterキーでも保存できるようにする
+  document.getElementById('nameInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveName();
+  });
+
+  // ── 教科選択 ──
+  let selectedSubject = '国語';
+
+  function selectSubject(btn) {
+    document.querySelectorAll('.subject-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedSubject = btn.dataset.subject;
+    const customArea = document.getElementById('customSubjectArea');
+    if (selectedSubject === 'その他') {
+      customArea.classList.add('show');
+      document.getElementById('customSubjectInput').focus();
+    } else {
+      customArea.classList.remove('show');
+    }
+  }
+
+  function getSelectedSubjectName() {
+    if (selectedSubject === 'その他') {
+      const custom = document.getElementById('customSubjectInput').value.trim();
+      return custom || 'その他';
+    }
+    return selectedSubject;
+  }
+
+  // ── 今日の日付をセット ──
+  function todayString() {
+    // ローカル時間で YYYY-MM-DD を作る
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  document.getElementById('dateInput').value = todayString();
+
+  // ── 記録を追加 ──
+  function addRecord() {
+    const date = document.getElementById('dateInput').value;
+    const minutes = parseInt(document.getElementById('minutesInput').value, 10);
+    const subject = getSelectedSubjectName();
+
+    if (!date) { alert('日付を入れてください'); return; }
+    if (!minutes || minutes < 1) { alert('時間（分）を入れてください'); return; }
+
+    const records = loadData();
+    records.push({
+      id: Date.now(),
+      date,
+      subject,
+      minutes,
+    });
+    saveData(records);
+
+    // フォームをリセット（日付はそのまま残す）
+    document.getElementById('minutesInput').value = '';
+    renderRecords();
+  }
+
+  // ── 記録を削除 ──
+  function deleteRecord(id) {
+    const records = loadData().filter(r => r.id !== id);
+    saveData(records);
+    renderRecords();
+  }
+
+  // ── 日付を読みやすく表示する ──
+  function formatDate(dateStr) {
+    // dateStr = "2026-07-10" → "7月10日（木）"
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const days = ['日', '月', '火', '水', '木', '金', '土'];
+    return `${m}月${d}日（${days[date.getDay()]}）`;
+  }
+
+  // ── 記録一覧を描画 ──
+  function renderRecords() {
+    const records = loadData().sort((a, b) => {
+      // 新しい日付→古い日付の順、同じ日付は追加が新しい順
+      if (b.date !== a.date) return b.date.localeCompare(a.date);
+      return b.id - a.id;
+    });
+
+    const container = document.getElementById('recordList');
+    const totalEl = document.getElementById('totalBadge');
+
+    // 合計時間を計算
+    const total = records.reduce((sum, r) => sum + r.minutes, 0);
+    if (records.length > 0) {
+      const h = Math.floor(total / 60);
+      const m = total % 60;
+      const timeStr = h > 0 ? `${h}時間${m}分` : `${m}分`;
+      totalEl.textContent = `${records.length}件 ／ 合計 ${timeStr}`;
+    } else {
+      totalEl.textContent = '';
+    }
+
+    if (records.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-emoji">📝</div>
+          <p>まだ記録がありません。<br>上のフォームから記録してみよう！</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = records.map(r => `
+      <div class="record-item">
+        <div class="record-subject-dot" style="background:${getSubjectColor(r.subject)}">
+          ${getSubjectEmoji(r.subject)}
+        </div>
+        <div class="record-info">
+          <div class="record-subject-name">${r.subject}</div>
+          <div class="record-date">${formatDate(r.date)}</div>
+        </div>
+        <div class="record-time">${r.minutes}<span> 分</span></div>
+        <button class="delete-btn" onclick="deleteRecord(${r.id})" title="削除">🗑</button>
+      </div>
+    `).join('');
+  }
+
+  // ── 起動時の処理 ──
+  const name = loadName();
+  if (!name) {
+    // 初回：名前入力モーダルを表示
+    document.getElementById('nameModal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('nameInput').focus(), 100);
+  } else {
+    document.getElementById('nameModal').classList.add('hidden');
+  }
+
+  updateHeader();
+  renderRecords();
+</script>
+</body>
+</html>
