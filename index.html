@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>勉強きろく</title>
+  <title>学習記録</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -433,16 +433,17 @@
 <!-- ヘッダー -->
 <header>
   <div class="header-top">
-    <div class="app-title">📚 勉強きろく</div>
+    <div class="app-title">📚 学習記録</div>
     <button class="name-display" onclick="openNameModal()">
       <span id="headerName" class="name-display-name"></span>
       <span>✏️</span>
     </button>
   </div>
   <div class="tab-bar">
-    <button class="tab-btn active" id="tab-study" onclick="switchTab('study')">⏱ 勉強時間</button>
-    <button class="tab-btn" id="tab-test"  onclick="switchTab('test')">📝 組分けテスト</button>
-    <button class="tab-btn" id="tab-dash"  onclick="switchTab('dash')">📊 ダッシュボード</button>
+    <button class="tab-btn active" id="tab-study"    onclick="switchTab('study')">⏱ 勉強時間</button>
+    <button class="tab-btn" id="tab-test"     onclick="switchTab('test')">📝 テスト</button>
+    <button class="tab-btn" id="tab-dash"     onclick="switchTab('dash')">📊 グラフ</button>
+    <button class="tab-btn" id="tab-settings" onclick="switchTab('settings')">⚙️ 設定</button>
   </div>
 </header>
 
@@ -750,19 +751,7 @@
       <div class="kpi-row" id="dashKpi"></div>
     </div>
 
-    <!-- グラフ①：点数の推移 -->
-    <div class="card">
-      <div class="card-title">📈 テストの点数推移</div>
-      <div class="chart-legend">
-        <span class="legend-item"><span class="legend-dot" style="background:var(--c-kokugo)"></span>国語</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--c-sansu)"></span>算数</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--c-rika)"></span>理科</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--c-shakai)"></span>社会</span>
-      </div>
-      <div id="scoreChartWrap"><div class="chart-wrap"><canvas id="chartScore"></canvas></div></div>
-    </div>
-
-    <!-- グラフ②：偏差値の推移（新規追加） -->
+    <!-- グラフ①：偏差値の推移 -->
     <div class="card">
       <div class="card-title">📐 偏差値の推移</div>
       <div class="chart-legend">
@@ -772,6 +761,7 @@
         <span class="legend-item"><span class="legend-dot" style="background:var(--c-shakai)"></span>社会</span>
         <span class="legend-item"><span class="legend-dash" style="border-color:var(--c-total)"></span>総合</span>
       </div>
+      <div id="deviationSchoolLegend"></div>
       <div id="deviationChartWrap"><div class="chart-wrap"><canvas id="chartDeviation"></canvas></div></div>
     </div>
 
@@ -795,6 +785,38 @@
     </div>
 
   </div><!-- /panel-dash -->
+
+  <!-- ===== 設定タブ ===== -->
+  <div class="tab-panel" id="panel-settings">
+    <div class="card">
+      <div class="card-title">🏫 志望校マスタ</div>
+
+      <!-- 編集中バナー -->
+      <div class="edit-mode-banner" id="schoolEditBanner" style="display:none">
+        ✏️ 編集中です
+        <button class="cancel-edit-btn" onclick="cancelEditSchool()">キャンセル</button>
+      </div>
+
+      <div class="form-group">
+        <label>学校名</label>
+        <input type="text" class="text-input" id="schoolNameInput" placeholder="例：早稲田中学校" maxlength="30" />
+      </div>
+      <div class="form-group">
+        <label>目標偏差値（4教科総合）</label>
+        <div class="time-input-row">
+          <input type="number" id="schoolDeviationInput" min="30" max="80" step="0.1" placeholder="62" />
+          <span class="time-unit">（30〜80）</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="schoolSubmitBtn" onclick="addOrUpdateSchool()">追加する</button>
+    </div>
+
+    <div class="section-header">
+      <div class="section-title">登録済み志望校</div>
+      <div class="total-badge" id="schoolTotalBadge"></div>
+    </div>
+    <div id="schoolList"></div>
+  </div><!-- /panel-settings -->
 
 </main>
 
@@ -864,7 +886,8 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('panel-' + tab).classList.add('active');
-  if (tab === 'dash') renderDashboard();
+  if (tab === 'dash')     renderDashboard();
+  if (tab === 'settings') renderSchoolList();
 }
 
 // =====================================================
@@ -1398,7 +1421,6 @@ Chart.defaults.color = '#6c6c70';
 
 function renderDashboard() {
   renderKpi();
-  renderScoreChart();
   renderDeviationChart();
   renderReviewProgress();
   renderStudyChart();
@@ -1461,12 +1483,13 @@ function renderScoreChart() {
   });
 }
 
-// ── グラフ②：偏差値推移（折れ線）── ※新規追加
+// ── グラフ①：偏差値推移（折れ線）＋志望校目標ライン
 function renderDeviationChart() {
   const groups = getTestGroups();
   if (!groups.length) {
     document.getElementById('deviationChartWrap').innerHTML =
       `<div class="empty-state" style="padding:24px 0"><div class="empty-state-emoji">📐</div><p>テスト記録を追加すると<br>偏差値の推移が表示されます</p></div>`;
+    document.getElementById('deviationSchoolLegend').innerHTML = '';
     return;
   }
   const labels = groups.map(g => `${g.grade ? g.grade+' ' : ''}${g.round}`);
@@ -1492,6 +1515,32 @@ function renderDeviationChart() {
     borderWidth: 2.5, borderDash: [6, 3],
     tension: 0.3, spanGaps: false,
   });
+
+  // 志望校の目標偏差値ライン（点線＋ラベル）
+  const schools = loadTargetSchools();
+  schools.forEach((school, i) => {
+    const color = SCHOOL_COLORS[i % SCHOOL_COLORS.length];
+    datasets.push({
+      label: `🏫 ${school.name}`,
+      data: groups.map(() => school.targetDeviation),
+      borderColor: color,
+      borderWidth: 2,
+      borderDash: [5, 5],
+      pointRadius: 0,
+      tension: 0,
+      fill: false,
+      spanGaps: true,
+    });
+  });
+
+  // 志望校の凡例を動的に更新
+  document.getElementById('deviationSchoolLegend').innerHTML =
+    schools.length > 0
+      ? `<div class="chart-legend" style="margin-top:2px">${schools.map((s, i) => {
+          const color = SCHOOL_COLORS[i % SCHOOL_COLORS.length];
+          return `<span class="legend-item"><span class="legend-dash" style="border-color:${color}"></span>🏫 ${s.name}（目標 ${s.targetDeviation}）</span>`;
+        }).join('')}</div>`
+      : '';
 
   if (chartDeviationInstance) { chartDeviationInstance.destroy(); chartDeviationInstance = null; }
   document.getElementById('deviationChartWrap').innerHTML = `<div class="chart-wrap"><canvas id="chartDeviation"></canvas></div>`;
@@ -1609,6 +1658,86 @@ function renderStudyChart() {
 }
 
 // =====================================================
+//  設定タブ：志望校マスタ
+// =====================================================
+const SCHOOL_COLORS = ['#e03131','#1971c2','#2f9e44','#e67700','#7048e8','#c92a2a'];
+let editingSchoolId = null;
+
+function loadTargetSchools() { return JSON.parse(localStorage.getItem('targetSchools') || '[]'); }
+function saveTargetSchools(d) { localStorage.setItem('targetSchools', JSON.stringify(d)); }
+
+function addOrUpdateSchool() {
+  const name = document.getElementById('schoolNameInput').value.trim();
+  const dev  = parseNum(document.getElementById('schoolDeviationInput').value);
+  if (!name)                                { alert('学校名を入力してください'); return; }
+  if (dev === null || dev < 30 || dev > 80) { alert('目標偏差値を 30〜80 の範囲で入力してください'); return; }
+
+  const schools = loadTargetSchools();
+  if (editingSchoolId) {
+    const idx = schools.findIndex(s => s.id === editingSchoolId);
+    if (idx >= 0) schools[idx] = { ...schools[idx], name, targetDeviation: dev };
+    cancelEditSchool();
+  } else {
+    schools.push({ id: Date.now(), name, targetDeviation: dev });
+    document.getElementById('schoolNameInput').value      = '';
+    document.getElementById('schoolDeviationInput').value = '';
+  }
+  saveTargetSchools(schools);
+  renderSchoolList();
+}
+
+function editSchool(id) {
+  const school = loadTargetSchools().find(s => s.id === id);
+  if (!school) return;
+  editingSchoolId = id;
+  document.getElementById('schoolNameInput').value      = school.name;
+  document.getElementById('schoolDeviationInput').value = school.targetDeviation;
+  document.getElementById('schoolEditBanner').style.display = 'flex';
+  document.getElementById('schoolSubmitBtn').textContent    = '✏️ 更新する';
+  document.querySelector('#panel-settings .card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function cancelEditSchool() {
+  editingSchoolId = null;
+  document.getElementById('schoolEditBanner').style.display = 'none';
+  document.getElementById('schoolSubmitBtn').textContent    = '追加する';
+  document.getElementById('schoolNameInput').value          = '';
+  document.getElementById('schoolDeviationInput').value     = '';
+}
+
+function deleteSchool(id) {
+  if (!confirm('この志望校を削除しますか？')) return;
+  if (editingSchoolId === id) cancelEditSchool();
+  saveTargetSchools(loadTargetSchools().filter(s => s.id !== id));
+  renderSchoolList();
+}
+
+function renderSchoolList() {
+  const schools   = loadTargetSchools();
+  const container = document.getElementById('schoolList');
+  document.getElementById('schoolTotalBadge').textContent = schools.length > 0 ? `${schools.length}校` : '';
+  if (!schools.length) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="empty-state-emoji">🏫</div>
+      <p>まだ志望校が登録されていません。<br>上のフォームから追加してみよう！</p>
+    </div>`;
+    return;
+  }
+  container.innerHTML = `<div class="record-list-gap">${schools.map((s, i) => {
+    const color = SCHOOL_COLORS[i % SCHOOL_COLORS.length];
+    return `<div class="study-record-item">
+      <div class="record-subject-dot" style="background:${color}22">🏫</div>
+      <div class="record-info">
+        <div class="record-subject-name">${s.name}</div>
+        <div class="record-date">目標偏差値（4教科総合）：<strong style="color:${color}">${s.targetDeviation}</strong></div>
+      </div>
+      <button class="edit-btn"   onclick="editSchool(${s.id})">✏️</button>
+      <button class="delete-btn" onclick="deleteSchool(${s.id})">🗑</button>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// =====================================================
 //  起動時の処理
 // =====================================================
 // 旧形式のテストデータを自動クリア（ユーザーが「消してOK」と確認済み）
@@ -1629,6 +1758,7 @@ if (!_name) {
 updateHeader();
 renderStudyRecords();
 renderTestRecords();
+renderSchoolList();
 </script>
 </body>
 </html>
