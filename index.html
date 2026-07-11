@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>学習記録</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <style>
     :root {
       --bg: #f2f2f7;
@@ -434,6 +435,7 @@
 <header>
   <div class="header-top">
     <div class="app-title">📚 学習記録</div>
+    <span id="syncStatus" style="font-size:12px;color:var(--text-secondary);opacity:0;transition:opacity 0.4s;flex:1;text-align:center;pointer-events:none;"></span>
     <button class="name-display" onclick="openNameModal()">
       <span id="headerName" class="name-display-name"></span>
       <span>✏️</span>
@@ -822,6 +824,129 @@
 
 <script>
 // =====================================================
+//  Supabase 設定
+// =====================================================
+const SUPABASE_URL = 'https://jqtmibcnllvbpwvzxlea.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_9ATK4N1-amyEWwJiCVgOJA_wpQ5Anka';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 画面上部に同期状態を一瞬表示するヘルパー
+let _syncTimer = null;
+function showSyncStatus(msg) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(_syncTimer);
+  if (msg === '☁️ 同期済み') {
+    _syncTimer = setTimeout(() => { el.style.opacity = '0'; }, 2000);
+  }
+}
+
+// ── フィールド変換（camelCase ↔ snake_case）──
+
+function toStudyRow(r, n)  {
+  return { id: r.id, child_name: n, date: r.date, subject: r.subject,
+           minutes: r.minutes, content: r.content || null };
+}
+function fromStudyRow(r) {
+  return { id: Number(r.id), date: r.date, subject: r.subject,
+           minutes: r.minutes, content: r.content || '' };
+}
+function toTestRow(e, n) {
+  return { id: e.id, child_name: n, grade: e.grade || null,
+           round: e.round || null, year: e.year || null, date: e.date,
+           subjects: e.subjects, total_deviation: e.totalDeviation ?? null };
+}
+function fromTestRow(r) {
+  return { id: Number(r.id), grade: r.grade || '', round: r.round || '',
+           year: r.year || '', date: r.date, subjects: r.subjects,
+           totalDeviation: r.total_deviation ?? null };
+}
+function toSchoolRow(s, n) {
+  return { id: s.id, child_name: n, name: s.name, target_deviation: s.targetDeviation };
+}
+function fromSchoolRow(r) {
+  return { id: Number(r.id), name: r.name, targetDeviation: r.target_deviation };
+}
+
+// ── Supabase へのアップロード（全件削除→再挿入）──
+// localStorage への保存後に非同期で呼び出す。失敗してもアプリは動き続ける。
+
+async function syncStudyRecords(records) {
+  const n = loadName(); if (!n) return;
+  showSyncStatus('☁️ 同期中…');
+  try {
+    await sb.from('study_records').delete().eq('child_name', n);
+    if (records.length) await sb.from('study_records').insert(records.map(r => toStudyRow(r, n)));
+    showSyncStatus('☁️ 同期済み');
+  } catch(e) { console.warn('sync study_records:', e.message); showSyncStatus(''); }
+}
+async function syncTestEntries(entries) {
+  const n = loadName(); if (!n) return;
+  showSyncStatus('☁️ 同期中…');
+  try {
+    await sb.from('study_test_entries').delete().eq('child_name', n);
+    if (entries.length) await sb.from('study_test_entries').insert(entries.map(e => toTestRow(e, n)));
+    showSyncStatus('☁️ 同期済み');
+  } catch(e) { console.warn('sync study_test_entries:', e.message); showSyncStatus(''); }
+}
+async function syncTargetSchools(schools) {
+  const n = loadName(); if (!n) return;
+  showSyncStatus('☁️ 同期中…');
+  try {
+    await sb.from('study_target_schools').delete().eq('child_name', n);
+    if (schools.length) await sb.from('study_target_schools').insert(schools.map(s => toSchoolRow(s, n)));
+    showSyncStatus('☁️ 同期済み');
+  } catch(e) { console.warn('sync study_target_schools:', e.message); showSyncStatus(''); }
+}
+
+// ── 起動時：Supabase → localStorage へのマージ ──
+// Supabase にあって localStorage にないレコードだけ追加する（既存データは上書きしない）
+
+async function pullFromSupabase() {
+  const n = loadName(); if (!n) return;
+  try {
+    const [{ data: sd }, { data: td }, { data: sc }] = await Promise.all([
+      sb.from('study_records').select('*').eq('child_name', n),
+      sb.from('study_test_entries').select('*').eq('child_name', n),
+      sb.from('study_target_schools').select('*').eq('child_name', n),
+    ]);
+
+    // 勉強時間
+    if (sd && sd.length) {
+      const local = loadStudyData();
+      const ids = new Set(local.map(r => r.id));
+      const toAdd = sd.filter(r => !ids.has(Number(r.id))).map(fromStudyRow);
+      if (toAdd.length) {
+        localStorage.setItem('studyRecords', JSON.stringify([...local, ...toAdd]));
+        renderStudyRecords();
+      }
+    }
+    // テスト記録
+    if (td && td.length) {
+      const local = loadTestData();
+      const ids = new Set(local.map(e => e.id));
+      const toAdd = td.filter(e => !ids.has(Number(e.id))).map(fromTestRow);
+      if (toAdd.length) {
+        localStorage.setItem('testEntries', JSON.stringify([...local, ...toAdd]));
+        renderTestRecords();
+      }
+    }
+    // 志望校マスタ
+    if (sc && sc.length) {
+      const local = loadTargetSchools();
+      const ids = new Set(local.map(s => s.id));
+      const toAdd = sc.filter(s => !ids.has(Number(s.id))).map(fromSchoolRow);
+      if (toAdd.length) {
+        localStorage.setItem('targetSchools', JSON.stringify([...local, ...toAdd]));
+        renderSchoolList();
+      }
+    }
+  } catch(e) { console.warn('pullFromSupabase:', e.message); }
+}
+
+// =====================================================
 //  定数
 // =====================================================
 const TEST_SUBJECTS = [
@@ -866,6 +991,7 @@ function saveName() {
   localStorage.setItem('childName', val);
   document.getElementById('nameModal').classList.add('hidden');
   updateHeader();
+  pullFromSupabase();
 }
 function updateHeader() {
   const name = loadName();
@@ -894,7 +1020,7 @@ function switchTab(tab) {
 //  勉強時間タブ（変更なし）
 // =====================================================
 function loadStudyData() { return JSON.parse(localStorage.getItem('studyRecords') || '[]'); }
-function saveStudyData(d) { localStorage.setItem('studyRecords', JSON.stringify(d)); }
+function saveStudyData(d) { localStorage.setItem('studyRecords', JSON.stringify(d)); syncStudyRecords(d); }
 
 let selectedSubject  = '国語';
 let editingStudyId   = null;   // 編集中の勉強記録ID
@@ -1115,7 +1241,7 @@ function renderStudyRecords() {
 */
 
 function loadTestData() { return JSON.parse(localStorage.getItem('testEntries') || '[]'); }
-function saveTestData(d) { localStorage.setItem('testEntries', JSON.stringify(d)); }
+function saveTestData(d) { localStorage.setItem('testEntries', JSON.stringify(d)); syncTestEntries(d); }
 
 // 旧形式（1エントリ＝1教科）のデータが残っていたら自動で消去する
 function migrateTestData() {
@@ -1664,7 +1790,7 @@ const SCHOOL_COLORS = ['#e03131','#1971c2','#2f9e44','#e67700','#7048e8','#c92a2
 let editingSchoolId = null;
 
 function loadTargetSchools() { return JSON.parse(localStorage.getItem('targetSchools') || '[]'); }
-function saveTargetSchools(d) { localStorage.setItem('targetSchools', JSON.stringify(d)); }
+function saveTargetSchools(d) { localStorage.setItem('targetSchools', JSON.stringify(d)); syncTargetSchools(d); }
 
 function addOrUpdateSchool() {
   const name = document.getElementById('schoolNameInput').value.trim();
@@ -1759,6 +1885,7 @@ updateHeader();
 renderStudyRecords();
 renderTestRecords();
 renderSchoolList();
+if (_name) pullFromSupabase();
 </script>
 </body>
 </html>
