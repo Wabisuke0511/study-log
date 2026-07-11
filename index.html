@@ -184,6 +184,55 @@
     .record-date { font-size: 13px; color: var(--text-secondary); }
     .record-time { font-size: 20px; font-weight: 700; color: var(--primary); margin-right: 8px; white-space: nowrap; }
     .record-time span { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+    .record-content { font-size: 12px; color: var(--text-secondary); margin-top: 3px; white-space: pre-wrap; word-break: break-all; }
+
+    /* ── 勉強時間タブ：日ごと/すべて切り替え ── */
+    .view-mode-tabs {
+      display: flex; background: var(--bg); border-radius: var(--radius-sm);
+      padding: 3px; margin-bottom: 12px; gap: 2px;
+    }
+    .view-mode-btn {
+      flex: 1; padding: 8px 10px; border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      background: none; cursor: pointer; transition: all 0.15s;
+    }
+    .view-mode-btn.active {
+      background: var(--card); color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+    /* 日付ナビゲーションバー */
+    .date-nav {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    }
+    .day-nav-btn {
+      width: 38px; height: 38px; flex-shrink: 0;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--card); font-size: 15px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .day-nav-btn:hover { background: var(--bg); }
+    .date-nav input[type="date"] {
+      flex: 1; padding: 8px 10px; font-size: 15px;
+      border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--card); color: var(--text);
+      -webkit-appearance: none; appearance: none;
+    }
+    .today-btn {
+      padding: 8px 14px; border: 1.5px solid var(--primary);
+      border-radius: var(--radius-sm); background: none;
+      font-size: 13px; font-weight: 600; color: var(--primary);
+      cursor: pointer; transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+    }
+    .today-btn:hover { background: var(--primary); color: #fff; }
+    /* 日別合計バー */
+    .day-summary {
+      background: #eef4ff; border-radius: var(--radius-sm);
+      padding: 10px 16px; margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .day-summary-label { font-size: 13px; color: var(--text-secondary); font-weight: 600; }
+    .day-summary-total { font-size: 20px; font-weight: 800; color: var(--primary); }
 
     /* ── 組分けテストタブ（新デザイン） ── */
     .test-meta-grid {
@@ -267,6 +316,29 @@
     .total-dev-label {
       font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; display: block;
     }
+
+    /* 入力モード切り替えタブ（一括 / 個別） */
+    .input-mode-tabs {
+      display: flex; background: var(--bg); border-radius: var(--radius-sm);
+      padding: 3px; margin-bottom: 16px; gap: 2px;
+    }
+    .input-mode-btn {
+      flex: 1; padding: 8px 10px; border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      background: none; cursor: pointer; transition: all 0.15s;
+    }
+    .input-mode-btn.active {
+      background: var(--card); color: var(--text);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+    }
+    /* 個別入力の教科選択ボタン */
+    .single-subj-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .single-subj-btn {
+      padding: 9px 16px; border: 1.5px solid var(--border); border-radius: 100px;
+      background: none; font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s; color: var(--text);
+    }
+    .single-subj-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
     /* テストカード（新テーブルレイアウト） */
     .test-card {
@@ -376,10 +448,17 @@
 
 <main>
 
-  <!-- ===== 勉強時間タブ（変更なし） ===== -->
+  <!-- ===== 勉強時間タブ ===== -->
   <div class="tab-panel active" id="panel-study">
     <div class="card">
       <div class="card-title">新しく記録する</div>
+
+      <!-- 編集中バナー（編集ボタンを押したときだけ表示） -->
+      <div class="edit-mode-banner" id="studyEditBanner" style="display:none">
+        ✏️ 編集中です
+        <button class="cancel-edit-btn" onclick="cancelEditStudy()">キャンセル</button>
+      </div>
+
       <div class="form-group">
         <label>日付</label>
         <input type="date" id="studyDateInput" />
@@ -404,12 +483,31 @@
           <span class="time-unit">分</span>
         </div>
       </div>
-      <button class="btn btn-primary" onclick="addStudyRecord()">記録する</button>
+      <div class="form-group">
+        <label>学習内容（任意）</label>
+        <input type="text" class="text-input" id="studyContentInput" placeholder="例：分数の割り算、漢字の直し" maxlength="100" />
+      </div>
+      <button class="btn btn-primary" id="studySubmitBtn" onclick="addStudyRecord()">記録する</button>
     </div>
     <div class="section-header">
       <div class="section-title">記録一覧</div>
       <div class="total-badge" id="studyTotalBadge"></div>
     </div>
+
+    <!-- 日ごと／すべて 切り替えタブ -->
+    <div class="view-mode-tabs">
+      <button class="view-mode-btn active" data-mode="day" onclick="setViewMode('day')">📅 日ごと</button>
+      <button class="view-mode-btn"        data-mode="all" onclick="setViewMode('all')">📋 すべて</button>
+    </div>
+
+    <!-- 日付ナビゲーション（日ごとモードのみ表示） -->
+    <div class="date-nav" id="studyDateNav">
+      <button class="day-nav-btn" onclick="changeStudyDay(-1)">◀</button>
+      <input type="date" id="viewDateInput" onchange="onViewDateChange()" />
+      <button class="day-nav-btn" onclick="changeStudyDay(1)">▶</button>
+      <button class="today-btn" onclick="goToToday()">今日</button>
+    </div>
+
     <div id="studyRecordList"></div>
   </div>
 
@@ -461,7 +559,14 @@
         </div>
       </div>
 
-      <!-- 教科別入力（4教科。受けていない教科は空欄でOK） -->
+      <!-- 入力モード切り替え -->
+      <div class="input-mode-tabs">
+        <button class="input-mode-btn active" data-mode="bulk"   onclick="setInputMode('bulk')">📋 一括入力</button>
+        <button class="input-mode-btn"        data-mode="single" onclick="setInputMode('single')">✏️ 個別入力</button>
+      </div>
+
+      <!-- ===== 一括入力エリア ===== -->
+      <div id="inputBulk">
       <span class="subject-sections-label">教科別の記録（受けていない教科は空欄でOK）</span>
 
       <!-- 国語 -->
@@ -582,6 +687,49 @@
           </div>
         </div>
       </div>
+
+      </div><!-- /inputBulk -->
+
+      <!-- ===== 個別入力エリア ===== -->
+      <div id="inputSingle" style="display:none">
+        <div class="form-group">
+          <label>教科</label>
+          <div class="single-subj-row">
+            <button class="single-subj-btn active" data-key="kokugo" onclick="selectSingleSubject(this)">📖 国語</button>
+            <button class="single-subj-btn" data-key="sansu"  onclick="selectSingleSubject(this)">🔢 算数</button>
+            <button class="single-subj-btn" data-key="rika"   onclick="selectSingleSubject(this)">🔬 理科</button>
+            <button class="single-subj-btn" data-key="shakai" onclick="selectSingleSubject(this)">🌍 社会</button>
+          </div>
+        </div>
+        <div class="subject-section">
+          <div class="subject-section-header" id="singleSubjectHeader">📖 国語</div>
+          <div class="subject-input-grid">
+            <div>
+              <span class="sic-label">点数</span>
+              <input type="number" class="sic-input" id="s_score" min="0" max="999" placeholder="－" />
+            </div>
+            <div>
+              <span class="sic-label">偏差値</span>
+              <input type="number" class="sic-input" id="s_deviation" min="0" max="99" step="0.1" placeholder="－" />
+            </div>
+            <div>
+              <span class="sic-label">平均点</span>
+              <input type="number" class="sic-input" id="s_average" min="0" max="999" step="0.1" placeholder="－" />
+            </div>
+          </div>
+          <div class="review-row">
+            <label class="review-cb-label">
+              <input type="checkbox" id="s_reviewed" onchange="toggleSingleReviewDate()" />
+              解き直し済み
+            </label>
+            <input type="date" class="review-date-inp" id="s_reviewDate" style="display:none" />
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:4px">
+          <label>総合偏差値（任意・入力すると上書き）</label>
+          <input type="number" id="s_totalDeviation" min="0" max="99" step="0.1" placeholder="－" />
+        </div>
+      </div><!-- /inputSingle -->
 
       <button class="btn btn-primary" id="testSubmitBtn" onclick="addOrUpdateTestEntry()">登録する</button>
     </div>
@@ -725,7 +873,46 @@ function switchTab(tab) {
 function loadStudyData() { return JSON.parse(localStorage.getItem('studyRecords') || '[]'); }
 function saveStudyData(d) { localStorage.setItem('studyRecords', JSON.stringify(d)); }
 
-let selectedSubject = '国語';
+let selectedSubject  = '国語';
+let editingStudyId   = null;   // 編集中の勉強記録ID
+let studyViewMode    = 'day';  // 'day'（日ごと）| 'all'（すべて）
+let studyViewDate    = '';     // 日ごとモードで選んでいる日付（startup で初期化）
+
+// 「日ごと」「すべて」の切り替え
+function setViewMode(mode) {
+  studyViewMode = mode;
+  document.querySelectorAll('.view-mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('studyDateNav').style.display = mode === 'day' ? 'flex' : 'none';
+  renderStudyRecords();
+}
+
+// ◀ ▶ で前後の日に移動する
+function changeStudyDay(delta) {
+  // 日付文字列（YYYY-MM-DD）をDateオブジェクトにして1日ずらす
+  const d = new Date(studyViewDate + 'T00:00:00');
+  d.setDate(d.getDate() + delta);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  studyViewDate = `${y}-${m}-${day}`;
+  document.getElementById('viewDateInput').value = studyViewDate;
+  renderStudyRecords();
+}
+
+// カレンダーで日付を直接選んだとき
+function onViewDateChange() {
+  const val = document.getElementById('viewDateInput').value;
+  if (val) { studyViewDate = val; renderStudyRecords(); }
+}
+
+// 「今日」ボタン
+function goToToday() {
+  studyViewDate = todayString();
+  document.getElementById('viewDateInput').value = studyViewDate;
+  renderStudyRecords();
+}
+
 function selectSubject(btn) {
   document.querySelectorAll('.subject-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
@@ -734,49 +921,152 @@ function selectSubject(btn) {
   selectedSubject === 'その他' ? area.classList.add('show') : area.classList.remove('show');
 }
 
+// 教科ボタンを指定した教科名でアクティブにするヘルパー
+function setActiveSubjectBtn(subjectName) {
+  const btns = document.querySelectorAll('.subject-btn');
+  let matched = false;
+  btns.forEach(b => {
+    b.classList.remove('active');
+    if (b.dataset.subject === subjectName) { b.classList.add('active'); matched = true; }
+  });
+  // 標準4教科に一致しない場合は「その他」ボタンをアクティブに
+  if (!matched) {
+    document.querySelector('.subject-btn[data-subject="その他"]').classList.add('active');
+    document.getElementById('customSubjectArea').classList.add('show');
+    document.getElementById('customSubjectInput').value = subjectName;
+  } else {
+    document.getElementById('customSubjectArea').classList.remove('show');
+    document.getElementById('customSubjectInput').value = '';
+  }
+  selectedSubject = subjectName;
+}
+
 function addStudyRecord() {
   const date    = document.getElementById('studyDateInput').value;
   const minutes = parseInt(document.getElementById('minutesInput').value, 10);
+  const content = document.getElementById('studyContentInput').value.trim();
   const subject = selectedSubject === 'その他'
     ? (document.getElementById('customSubjectInput').value.trim() || 'その他')
     : selectedSubject;
-  if (!date)                { alert('日付を入れてください'); return; }
+  if (!date)                   { alert('日付を入れてください'); return; }
   if (!minutes || minutes < 1) { alert('時間（分）を入れてください'); return; }
+
   const records = loadStudyData();
-  records.push({ id: Date.now(), date, subject, minutes });
+  if (editingStudyId) {
+    // 編集モード：既存レコードを上書き
+    const idx = records.findIndex(r => r.id === editingStudyId);
+    if (idx >= 0) records[idx] = { ...records[idx], date, subject, minutes, content };
+    cancelEditStudy();
+  } else {
+    // 新規追加
+    records.push({ id: Date.now(), date, subject, minutes, content });
+    document.getElementById('minutesInput').value = '';
+    document.getElementById('studyContentInput').value = '';
+  }
   saveStudyData(records);
-  document.getElementById('minutesInput').value = '';
   renderStudyRecords();
 }
 
+// 編集ボタンを押したとき：フォームにデータをセットする
+function editStudyRecord(id) {
+  const record = loadStudyData().find(r => r.id === id);
+  if (!record) return;
+  editingStudyId = id;
+  document.getElementById('studyDateInput').value    = record.date;
+  document.getElementById('minutesInput').value      = record.minutes;
+  document.getElementById('studyContentInput').value = record.content || '';
+  setActiveSubjectBtn(record.subject);
+  document.getElementById('studyEditBanner').style.display = 'flex';
+  document.getElementById('studySubmitBtn').textContent    = '✏️ 更新する';
+  // フォームの先頭へスクロール
+  document.querySelector('#panel-study .card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// 編集キャンセル
+function cancelEditStudy() {
+  editingStudyId = null;
+  document.getElementById('studyEditBanner').style.display = 'none';
+  document.getElementById('studySubmitBtn').textContent    = '記録する';
+  document.getElementById('studyDateInput').value          = todayString();
+  document.getElementById('minutesInput').value            = '';
+  document.getElementById('studyContentInput').value       = '';
+  setActiveSubjectBtn('国語');
+}
+
 function deleteStudyRecord(id) {
+  if (!confirm('この記録を削除しますか？')) return;
+  if (editingStudyId === id) cancelEditStudy();
   saveStudyData(loadStudyData().filter(r => r.id !== id));
   renderStudyRecords();
 }
 
+// 1件分のカードHTML（日ごと・すべて両モードで共用）
+function studyRecordCardHtml(r, showDate) {
+  return `<div class="study-record-item">
+    <div class="record-subject-dot" style="background:${SUBJECT_COLORS[r.subject]||'#f3e5f5'}">${SUBJECT_EMOJI[r.subject]||'✏️'}</div>
+    <div class="record-info">
+      <div class="record-subject-name">${r.subject}</div>
+      ${showDate ? `<div class="record-date">${formatDate(r.date)}</div>` : ''}
+      ${r.content ? `<div class="record-content">📝 ${r.content}</div>` : ''}
+    </div>
+    <div class="record-time">${r.minutes}<span> 分</span></div>
+    <button class="edit-btn"   onclick="editStudyRecord(${r.id})">✏️</button>
+    <button class="delete-btn" onclick="deleteStudyRecord(${r.id})">🗑</button>
+  </div>`;
+}
+
 function renderStudyRecords() {
-  const records = loadStudyData().sort((a, b) =>
+  const allRecords = loadStudyData().sort((a, b) =>
     b.date !== a.date ? b.date.localeCompare(a.date) : b.id - a.id);
   const container = document.getElementById('studyRecordList');
   const totalEl   = document.getElementById('studyTotalBadge');
-  const total     = records.reduce((s, r) => s + r.minutes, 0);
-  totalEl.textContent = records.length > 0
-    ? `${records.length}件 ／ 合計 ${Math.floor(total/60) > 0 ? Math.floor(total/60)+'時間' : ''}${total%60}分`
-    : '';
-  if (!records.length) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-state-emoji">📝</div><p>まだ記録がありません。<br>上のフォームから記録してみよう！</p></div>`;
-    return;
+
+  if (studyViewMode === 'day') {
+    // ── 日ごとモード：選んだ日だけ表示 ──
+    const dayRecords = allRecords.filter(r => r.date === studyViewDate);
+    const dayTotal   = dayRecords.reduce((s, r) => s + r.minutes, 0);
+    const h = Math.floor(dayTotal / 60), m = dayTotal % 60;
+
+    totalEl.textContent = dayRecords.length > 0
+      ? `${dayRecords.length}件 ／ ${h > 0 ? h+'時間' : ''}${m}分`
+      : '';
+
+    // 合計バー（記録がある日だけ表示）
+    const summaryHtml = dayRecords.length > 0
+      ? `<div class="day-summary">
+           <span class="day-summary-label">この日の合計勉強時間</span>
+           <span class="day-summary-total">${h > 0 ? h+'時間 ' : ''}${m}分</span>
+         </div>`
+      : '';
+
+    if (!dayRecords.length) {
+      container.innerHTML = `<div class="empty-state">
+        <div class="empty-state-emoji">📅</div>
+        <p>この日の記録はありません。<br>上のフォームから記録してみよう！</p>
+      </div>`;
+      return;
+    }
+    container.innerHTML = summaryHtml +
+      `<div class="record-list-gap">` +
+      dayRecords.map(r => studyRecordCardHtml(r, false)).join('') +
+      `</div>`;
+
+  } else {
+    // ── すべてモード：全記録を表示 ──
+    const total = allRecords.reduce((s, r) => s + r.minutes, 0);
+    const h = Math.floor(total / 60), m = total % 60;
+    totalEl.textContent = allRecords.length > 0
+      ? `${allRecords.length}件 ／ 合計 ${h > 0 ? h+'時間' : ''}${m}分`
+      : '';
+    if (!allRecords.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-emoji">📝</div><p>まだ記録がありません。<br>上のフォームから記録してみよう！</p></div>`;
+      return;
+    }
+    container.innerHTML =
+      `<div class="record-list-gap">` +
+      allRecords.map(r => studyRecordCardHtml(r, true)).join('') +
+      `</div>`;
   }
-  container.innerHTML = `<div class="record-list-gap">` + records.map(r => `
-    <div class="study-record-item">
-      <div class="record-subject-dot" style="background:${SUBJECT_COLORS[r.subject]||'#f3e5f5'}">${SUBJECT_EMOJI[r.subject]||'✏️'}</div>
-      <div class="record-info">
-        <div class="record-subject-name">${r.subject}</div>
-        <div class="record-date">${formatDate(r.date)}</div>
-      </div>
-      <div class="record-time">${r.minutes}<span> 分</span></div>
-      <button class="delete-btn" onclick="deleteStudyRecord(${r.id})">🗑</button>
-    </div>`).join('') + `</div>`;
 }
 
 // =====================================================
@@ -841,7 +1131,46 @@ function getSubjectInputs(key) {
   };
 }
 
-let editingTestId = null;  // 編集中のレコードIDを覚えておく変数
+let editingTestId   = null;  // 編集中のレコードID
+let inputMode       = 'bulk';
+let singleSubjKey   = 'kokugo';
+
+// 一括 / 個別 タブ切り替え
+function setInputMode(mode) {
+  inputMode = mode;
+  document.querySelectorAll('.input-mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode));
+  document.getElementById('inputBulk').style.display   = mode === 'bulk'   ? 'block' : 'none';
+  document.getElementById('inputSingle').style.display = mode === 'single' ? 'block' : 'none';
+}
+
+// 個別入力：教科ボタンを選ぶ
+function selectSingleSubject(btn) {
+  document.querySelectorAll('.single-subj-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  singleSubjKey = btn.dataset.key;
+  const subj = TEST_SUBJECTS.find(s => s.key === singleSubjKey);
+  document.getElementById('singleSubjectHeader').textContent = subj.emoji + ' ' + subj.label;
+}
+
+// 個別入力：「解き直した日」欄の表示切り替え
+function toggleSingleReviewDate() {
+  const cb = document.getElementById('s_reviewed');
+  const di = document.getElementById('s_reviewDate');
+  di.style.display = cb.checked ? 'inline-block' : 'none';
+  if (cb.checked && !di.value) di.value = todayString();
+}
+
+// 個別入力フォームをクリア
+function clearSingleForm() {
+  document.getElementById('s_score').value         = '';
+  document.getElementById('s_deviation').value     = '';
+  document.getElementById('s_average').value       = '';
+  document.getElementById('s_reviewed').checked    = false;
+  document.getElementById('s_reviewDate').value    = '';
+  document.getElementById('s_reviewDate').style.display = 'none';
+  document.getElementById('s_totalDeviation').value = '';
+}
 
 function addOrUpdateTestEntry() {
   const grade = document.getElementById('testGradeInput').value;
@@ -853,40 +1182,74 @@ function addOrUpdateTestEntry() {
   if (!year)  { alert('出題年度を入力してください'); return; }
   if (!date)  { alert('実施日を入れてください'); return; }
 
-  // 全教科のデータが空欄かチェック
-  const subjects = {};
-  let hasAnyData = false;
-  for (const s of TEST_SUBJECTS) {
-    const sub = getSubjectInputs(s.key);
-    subjects[s.key] = sub;
-    if (sub.score !== null || sub.deviation !== null || sub.average !== null) hasAnyData = true;
-  }
-  if (!hasAnyData) { alert('少なくとも1教科の点数・偏差値・平均点のどれかを入力してください'); return; }
-
-  const totalDeviation = parseNum(document.getElementById('totalDeviationInput').value);
-  const entry = {
-    id: editingTestId || Date.now(),
-    grade, round, year, date, subjects, totalDeviation,
-  };
-
   const entries = loadTestData();
-  if (editingTestId) {
-    const idx = entries.findIndex(e => e.id === editingTestId);
-    if (idx >= 0) entries[idx] = entry; else entries.push(entry);
-    cancelEditTest();
+
+  if (inputMode === 'bulk' || editingTestId) {
+    // ── 一括入力モード（または編集モード） ──
+    const subjects = {};
+    let hasAnyData = false;
+    for (const s of TEST_SUBJECTS) {
+      const sub = getSubjectInputs(s.key);
+      subjects[s.key] = sub;
+      if (sub.score !== null || sub.deviation !== null || sub.average !== null) hasAnyData = true;
+    }
+    if (!hasAnyData) { alert('少なくとも1教科の点数・偏差値・平均点のどれかを入力してください'); return; }
+
+    const totalDeviation = parseNum(document.getElementById('totalDeviationInput').value);
+    const entry = { id: editingTestId || Date.now(), grade, round, year, date, subjects, totalDeviation };
+
+    if (editingTestId) {
+      const idx = entries.findIndex(e => e.id === editingTestId);
+      if (idx >= 0) entries[idx] = entry; else entries.push(entry);
+      cancelEditTest();
+    } else {
+      entries.push(entry);
+      clearTestForm();
+    }
+
   } else {
-    entries.push(entry);
+    // ── 個別入力モード ──
+    const subData = {
+      score:      parseNum(document.getElementById('s_score').value),
+      deviation:  parseNum(document.getElementById('s_deviation').value),
+      average:    parseNum(document.getElementById('s_average').value),
+      reviewed:   document.getElementById('s_reviewed').checked,
+      reviewDate: document.getElementById('s_reviewDate').value || null,
+    };
+    if (subData.score === null && subData.deviation === null && subData.average === null) {
+      alert('点数・偏差値・平均点のどれかを入力してください');
+      return;
+    }
+    const newTotalDev = parseNum(document.getElementById('s_totalDeviation').value);
+
+    // 同じ学年・回・年度のレコードを探す
+    const existIdx = entries.findIndex(e => e.grade === grade && e.round === round && e.year === year);
+    if (existIdx >= 0) {
+      // 既存レコードのこの教科だけ上書き
+      entries[existIdx].subjects[singleSubjKey] = subData;
+      entries[existIdx].date = date;
+      if (newTotalDev !== null) entries[existIdx].totalDeviation = newTotalDev;
+    } else {
+      // 新規レコードを作り、今の教科だけ入力
+      const subjects = {};
+      for (const s of TEST_SUBJECTS) {
+        subjects[s.key] = { score: null, deviation: null, average: null, reviewed: false, reviewDate: null };
+      }
+      subjects[singleSubjKey] = subData;
+      entries.push({ id: Date.now(), grade, round, year, date, subjects, totalDeviation: newTotalDev });
+    }
+    clearSingleForm();
   }
+
   saveTestData(entries);
-  clearTestForm();
   renderTestRecords();
 }
 
-// フォームを空にする
+// フォームを空にする（一括・個別両方）
 function clearTestForm() {
-  document.getElementById('testYearInput').value  = '';
-  document.getElementById('testDateInput').value  = todayString();
-  document.getElementById('totalDeviationInput').value = '';
+  document.getElementById('testYearInput').value           = '';
+  document.getElementById('testDateInput').value           = todayString();
+  document.getElementById('totalDeviationInput').value     = '';
   document.getElementById('totalScoreDisplay').textContent = '－';
   for (const s of TEST_SUBJECTS) {
     document.getElementById('score_'      + s.key).value = '';
@@ -896,6 +1259,7 @@ function clearTestForm() {
     document.getElementById('reviewDate_' + s.key).value   = '';
     document.getElementById('reviewDate_' + s.key).style.display = 'none';
   }
+  clearSingleForm();
 }
 
 // 削除
@@ -906,8 +1270,9 @@ function deleteTestEntry(id) {
   renderTestRecords();
 }
 
-// 編集ボタンを押したときにフォームへデータをセットする
+// 編集ボタンを押したときにフォームへデータをセットする（常に一括モードで開く）
 function editTestEntry(id) {
+  setInputMode('bulk');
   const entry = loadTestData().find(e => e.id === id);
   if (!entry) return;
   editingTestId = id;
@@ -1249,8 +1614,11 @@ function renderStudyChart() {
 // 旧形式のテストデータを自動クリア（ユーザーが「消してOK」と確認済み）
 migrateTestData();
 
-document.getElementById('studyDateInput').value = todayString();
-document.getElementById('testDateInput').value  = todayString();
+// 日付の初期値をセット（今日）
+studyViewDate = todayString();
+document.getElementById('studyDateInput').value = studyViewDate;
+document.getElementById('viewDateInput').value  = studyViewDate;
+document.getElementById('testDateInput').value  = studyViewDate;
 
 const _name = loadName();
 if (!_name) {
