@@ -534,7 +534,7 @@
       <div class="test-meta-grid">
         <div class="form-group">
           <label>学年</label>
-          <select id="testGradeInput">
+          <select id="testGradeInput" onchange="onTestKeyChange()">
             <option value="">選択</option>
             <option value="小3">小3</option>
             <option value="小4">小4</option>
@@ -547,7 +547,7 @@
         </div>
         <div class="form-group">
           <label>第何回</label>
-          <select id="testRoundInput">
+          <select id="testRoundInput" onchange="onTestKeyChange()">
             <option value="">選択</option>
             <option value="第1回">第1回</option>
             <option value="第2回">第2回</option>
@@ -559,7 +559,7 @@
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>出題年度</label>
-          <input type="number" id="testYearInput" min="2000" max="2099" placeholder="2024" />
+          <input type="number" id="testYearInput" min="2000" max="2099" placeholder="2024" onchange="onTestKeyChange()" />
         </div>
         <div class="form-group" style="grid-column:1/-1">
           <label>実施日</label>
@@ -2238,6 +2238,21 @@ function lookupDeviation(master, subject, score) {
   return null;
 }
 
+// 学年・回・年度が変わったとき：平均点を自動入力
+function onTestKeyChange() {
+  const grade = document.getElementById('testGradeInput')?.value;
+  const round = document.getElementById('testRoundInput')?.value;
+  const year  = document.getElementById('testYearInput')?.value?.trim();
+  if (!grade || !round || !year) return;
+  const master = findDeviationMaster(grade, round, year);
+  if (!master?.averages) return;
+  const avg = master.averages;
+  for (const s of TEST_SUBJECTS) {
+    const v = avg[s.key];
+    if (v != null) document.getElementById('average_' + s.key).value = v;
+  }
+}
+
 // テストフォームの偏差値を自動計算して埋める（キャッシュ参照なので同期OK）
 function autoCalcDeviation() {
   const grade = document.getElementById('testGradeInput')?.value;
@@ -2254,6 +2269,7 @@ function autoCalcDeviation() {
     if (dev !== null) document.getElementById('deviation_' + s.key).value = dev;
     if (sc !== null) { total4 += sc; total4count++; }
   }
+  // 4教科全部入力済みなら総合偏差値も自動入力
   if (total4count === TEST_SUBJECTS.length) {
     const totalDev = lookupDeviation(master, 'total4', total4);
     if (totalDev !== null) document.getElementById('totalDeviationInput').value = totalDev;
