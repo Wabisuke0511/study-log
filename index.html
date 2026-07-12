@@ -1776,8 +1776,9 @@ function renderDeviationChart() {
     const icon = isBar
       ? `<span style="display:inline-block;width:12px;height:12px;background:${color};border-radius:2px;vertical-align:middle;margin-right:3px;"></span>`
       : `<span style="display:inline-block;width:16px;height:3px;background:${color};vertical-align:middle;margin-right:3px;border-radius:2px;"></span>`;
+    const isOn = ds.label === '総合' || ds.label.includes('C50') || ds.label.includes('早稲アカSS');
     return `<label style="display:inline-flex;align-items:center;font-size:12px;cursor:pointer;padding:3px 7px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);">
-      <input type="checkbox" ${isC50?'checked':''} onchange="toggleDeviationDataset(${i},this.checked)" style="margin-right:4px;accent-color:${color};">
+      <input type="checkbox" ${isOn?'checked':''} onchange="toggleDeviationDataset(${i},this.checked)" style="margin-right:4px;accent-color:${color};">
       ${icon}${ds.label}
     </label>`;
   }).join('');
