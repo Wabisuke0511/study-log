@@ -714,7 +714,7 @@
           <div class="subject-input-grid">
             <div>
               <span class="sic-label">点数</span>
-              <input type="number" class="sic-input" id="s_score" min="0" max="999" placeholder="－" />
+              <input type="number" class="sic-input" id="s_score" min="0" max="999" placeholder="－" oninput="autoCalcSingleDeviation()" />
             </div>
             <div>
               <span class="sic-label">偏差値</span>
@@ -1421,6 +1421,15 @@ function selectSingleSubject(btn) {
   singleSubjKey = btn.dataset.key;
   const subj = TEST_SUBJECTS.find(s => s.key === singleSubjKey);
   document.getElementById('singleSubjectHeader').textContent = subj.emoji + ' ' + subj.label;
+  // 科目切り替え時に平均点を更新
+  const grade = document.getElementById('testGradeInput')?.value;
+  const round = document.getElementById('testRoundInput')?.value;
+  const year  = document.getElementById('testYearInput')?.value?.trim();
+  if (grade && round && year) {
+    const master = findDeviationMaster(grade, round, year);
+    const avg = master?.averages?.[singleSubjKey];
+    if (avg != null) document.getElementById('s_average').value = avg;
+  }
 }
 
 // 個別入力：「解き直した日」欄の表示切り替え
@@ -2247,10 +2256,30 @@ function onTestKeyChange() {
   const master = findDeviationMaster(grade, round, year);
   if (!master?.averages) return;
   const avg = master.averages;
+  // 一括入力の平均点
   for (const s of TEST_SUBJECTS) {
     const v = avg[s.key];
     if (v != null) document.getElementById('average_' + s.key).value = v;
   }
+  // 個別入力の平均点
+  const sv = avg[singleSubjKey];
+  if (sv != null) document.getElementById('s_average').value = sv;
+}
+
+// 個別入力モードの偏差値・平均点を自動計算
+function autoCalcSingleDeviation() {
+  const grade = document.getElementById('testGradeInput')?.value;
+  const round = document.getElementById('testRoundInput')?.value;
+  const year  = document.getElementById('testYearInput')?.value?.trim();
+  if (!grade || !round || !year) return;
+  const master = findDeviationMaster(grade, round, year);
+  if (!master) return;
+  const sc = parseNum(document.getElementById('s_score').value);
+  const dev = lookupDeviation(master, singleSubjKey, sc);
+  if (dev !== null) document.getElementById('s_deviation').value = dev;
+  // 平均点
+  const avg = master.averages?.[singleSubjKey];
+  if (avg != null) document.getElementById('s_average').value = avg;
 }
 
 // テストフォームの偏差値を自動計算して埋める（キャッシュ参照なので同期OK）
