@@ -9,14 +9,21 @@ const cors = {
 };
 
 // Step1: 学校リストから「コード: 学校名」テキストを生成
+const BROWSER_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept-Language': 'ja,en-US;q=0.7,en;q=0.3',
+};
+
 async function fetchSchoolListText(): Promise<string> {
-  const res = await fetch(`${BASE}/`);
+  const res = await fetch(`${BASE}/`, { headers: BROWSER_HEADERS });
   if (!res.ok) throw new Error(`school list fetch: ${res.status}`);
   const html = await res.text();
   const lines: string[] = [];
   for (const m of html.matchAll(/[?&]code=(\d+)[^"']*['"][^>]*>([^<]{2,30})</g)) {
     lines.push(`${m[1]}: ${m[2].trim()}`);
   }
+  console.log(`School list extracted: ${lines.length} schools`);
   return lines.join('\n');
 }
 
@@ -44,7 +51,7 @@ ${schoolList}`,
 
 // Step3: 学校詳細ページをテキスト化して Claude で偏差値を抽出
 async function fetchDeviation(code: number): Promise<{ round: string; a80: number; c50: number }[]> {
-  const res = await fetch(`${BASE}/index.php?code=${code}`);
+  const res = await fetch(`${BASE}/?code=${code}`, { headers: BROWSER_HEADERS });
   if (!res.ok) throw new Error(`detail fetch: ${res.status}`);
   const html = await res.text();
 
