@@ -806,8 +806,10 @@
       <div class="form-group">
         <label>目標偏差値（4教科総合）</label>
         <div class="time-input-row">
-          <input type="number" id="schoolDeviationInput" min="30" max="80" step="0.1" placeholder="62" />
-          <span class="time-unit">（30〜80）</span>
+          <input type="number" id="schoolDeviationFrom" min="30" max="80" step="0.1" placeholder="60" />
+          <span class="time-unit">〜</span>
+          <input type="number" id="schoolDeviationTo" min="30" max="80" step="0.1" placeholder="65" />
+          <span class="time-unit" style="white-space:nowrap">（30〜80）</span>
         </div>
       </div>
       <button class="btn btn-primary" id="schoolSubmitBtn" onclick="addOrUpdateSchool()">追加する</button>
@@ -864,10 +866,14 @@ function fromTestRow(r) {
            totalDeviation: r.total_deviation ?? null };
 }
 function toSchoolRow(s, n) {
-  return { id: s.id, child_name: n, name: s.name, target_deviation: s.targetDeviation };
+  return { id: s.id, child_name: n, name: s.name,
+           target_deviation_from: s.targetDeviationFrom,
+           target_deviation_to:   s.targetDeviationTo };
 }
 function fromSchoolRow(r) {
-  return { id: Number(r.id), name: r.name, targetDeviation: r.target_deviation };
+  return { id: Number(r.id), name: r.name,
+           targetDeviationFrom: r.target_deviation_from ?? r.target_deviation ?? null,
+           targetDeviationTo:   r.target_deviation_to   ?? r.target_deviation ?? null };
 }
 
 // ── Supabase へのアップロード（全件削除→再挿入）──
@@ -1642,13 +1648,29 @@ function renderDeviationChart() {
     tension: 0.3, spanGaps: false,
   });
 
-  // 志望校の目標偏差値ライン（点線＋ラベル）
+  // 志望校の目標偏差値ライン（from〜to を帯で表示）
   const schools = loadTargetSchools();
   schools.forEach((school, i) => {
     const color = SCHOOL_COLORS[i % SCHOOL_COLORS.length];
+    const from = school.targetDeviationFrom ?? school.targetDeviation;
+    const to   = school.targetDeviationTo   ?? school.targetDeviation;
+    // 下限ライン（fill: '+1' で上限まで塗りつぶす）
     datasets.push({
-      label: `🏫 ${school.name}`,
-      data: groups.map(() => school.targetDeviation),
+      label: `🏫 ${school.name}（${from}〜${to}）`,
+      data: groups.map(() => from),
+      borderColor: color + '70',
+      backgroundColor: color + '18',
+      borderWidth: 1.5,
+      borderDash: [4, 4],
+      pointRadius: 0,
+      tension: 0,
+      fill: '+1',
+      spanGaps: true,
+    });
+    // 上限ライン
+    datasets.push({
+      label: `_${school.name}_to`,
+      data: groups.map(() => to),
       borderColor: color,
       borderWidth: 2,
       borderDash: [5, 5],
@@ -1664,7 +1686,9 @@ function renderDeviationChart() {
     schools.length > 0
       ? `<div class="chart-legend" style="margin-top:2px">${schools.map((s, i) => {
           const color = SCHOOL_COLORS[i % SCHOOL_COLORS.length];
-          return `<span class="legend-item"><span class="legend-dash" style="border-color:${color}"></span>🏫 ${s.name}（目標 ${s.targetDeviation}）</span>`;
+          const from = s.targetDeviationFrom ?? s.targetDeviation ?? '?';
+          const to   = s.targetDeviationTo   ?? s.targetDeviation ?? '?';
+          return `<span class="legend-item"><span class="legend-dash" style="border-color:${color}"></span>🏫 ${s.name}（${from}〜${to}）</span>`;
         }).join('')}</div>`
       : '';
 
@@ -1794,19 +1818,23 @@ function saveTargetSchools(d) { localStorage.setItem('targetSchools', JSON.strin
 
 function addOrUpdateSchool() {
   const name = document.getElementById('schoolNameInput').value.trim();
-  const dev  = parseNum(document.getElementById('schoolDeviationInput').value);
-  if (!name)                                { alert('学校名を入力してください'); return; }
-  if (dev === null || dev < 30 || dev > 80) { alert('目標偏差値を 30〜80 の範囲で入力してください'); return; }
+  const from = parseNum(document.getElementById('schoolDeviationFrom').value);
+  const to   = parseNum(document.getElementById('schoolDeviationTo').value);
+  if (!name) { alert('学校名を入力してください'); return; }
+  if (from === null || from < 30 || from > 80) { alert('偏差値（下限）を 30〜80 で入力してください'); return; }
+  if (to   === null || to   < 30 || to   > 80) { alert('偏差値（上限）を 30〜80 で入力してください'); return; }
+  if (from > to) { alert('下限は上限以下にしてください'); return; }
 
   const schools = loadTargetSchools();
   if (editingSchoolId) {
     const idx = schools.findIndex(s => s.id === editingSchoolId);
-    if (idx >= 0) schools[idx] = { ...schools[idx], name, targetDeviation: dev };
+    if (idx >= 0) schools[idx] = { ...schools[idx], name, targetDeviationFrom: from, targetDeviationTo: to };
     cancelEditSchool();
   } else {
-    schools.push({ id: Date.now(), name, targetDeviation: dev });
+    schools.push({ id: Date.now(), name, targetDeviationFrom: from, targetDeviationTo: to });
     document.getElementById('schoolNameInput').value      = '';
-    document.getElementById('schoolDeviationInput').value = '';
+    document.getElementById('schoolDeviationFrom').value  = '';
+    document.getElementById('schoolDeviationTo').value    = '';
   }
   saveTargetSchools(schools);
   renderSchoolList();
@@ -1817,7 +1845,8 @@ function editSchool(id) {
   if (!school) return;
   editingSchoolId = id;
   document.getElementById('schoolNameInput').value      = school.name;
-  document.getElementById('schoolDeviationInput').value = school.targetDeviation;
+  document.getElementById('schoolDeviationFrom').value  = school.targetDeviationFrom ?? '';
+  document.getElementById('schoolDeviationTo').value    = school.targetDeviationTo   ?? '';
   document.getElementById('schoolEditBanner').style.display = 'flex';
   document.getElementById('schoolSubmitBtn').textContent    = '✏️ 更新する';
   document.querySelector('#panel-settings .card').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1827,8 +1856,9 @@ function cancelEditSchool() {
   editingSchoolId = null;
   document.getElementById('schoolEditBanner').style.display = 'none';
   document.getElementById('schoolSubmitBtn').textContent    = '追加する';
-  document.getElementById('schoolNameInput').value          = '';
-  document.getElementById('schoolDeviationInput').value     = '';
+  document.getElementById('schoolNameInput').value         = '';
+  document.getElementById('schoolDeviationFrom').value     = '';
+  document.getElementById('schoolDeviationTo').value       = '';
 }
 
 function deleteSchool(id) {
@@ -1855,7 +1885,7 @@ function renderSchoolList() {
       <div class="record-subject-dot" style="background:${color}22">🏫</div>
       <div class="record-info">
         <div class="record-subject-name">${s.name}</div>
-        <div class="record-date">目標偏差値（4教科総合）：<strong style="color:${color}">${s.targetDeviation}</strong></div>
+        <div class="record-date">目標偏差値（4教科総合）：<strong style="color:${color}">${s.targetDeviationFrom ?? s.targetDeviation ?? '?'} 〜 ${s.targetDeviationTo ?? s.targetDeviation ?? '?'}</strong></div>
       </div>
       <button class="edit-btn"   onclick="editSchool(${s.id})">✏️</button>
       <button class="delete-btn" onclick="deleteSchool(${s.id})">🗑</button>
