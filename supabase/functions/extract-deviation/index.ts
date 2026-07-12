@@ -21,7 +21,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
-        max_tokens: 4096,
+        max_tokens: 8192,
         messages: [{
           role: 'user',
           content: [
@@ -31,21 +31,20 @@ serve(async (req) => {
             },
             {
               type: 'text',
-              text: `この画像は中学受験の偏差値換算表（評価表）です。
-表から以下の形式のJSONのみを出力してください（説明文・コードブロック不要）：
-{
-  "averages": { "sansu": 99, "kokugo": 82, "rika": 68, "shakai": 66, "total2": 181, "total3": 249, "total4": 315 },
-  "rows": [
-    { "dev": 75, "sansu": [196,199], "kokugo": [143,144], "rika": null, "shakai": null, "total2": null, "total3": null, "total4": null },
-    { "dev": 50, "sansu": [97,100], "kokugo": [81,83], "rika": [67,68], "shakai": [65,66], "total2": [179,183], "total3": [246,252], "total4": [311,319] }
-  ]
-}
+              text: `中学受験の偏差値換算表です。JSONのみ出力（説明・コードブロック不要）。
+
+形式：
+{"grade":"小4","round":"第4回","year":"2025","averages":{"sansu":99,"kokugo":82,"rika":68,"shakai":66,"total2":181,"total3":249,"total4":315},"rows":[{"dev":75,"sansu":[196,199],"kokugo":[143,144],"rika":null,"shakai":null,"total2":null,"total3":null,"total4":null}]}
+
 ルール：
-- rowsは偏差値の高い順（降順）で全行を含める
-- スコア範囲は[最小,最大]の配列。単一値（例：「94」）は[94,94]、空欄・「－」はnull
-- averagesは表最下部の「平均」行から取得。存在しない列はnull
-- 列が存在しない場合（例：理科・社会がない）はnull固定
-- 表に「3教科計」列がなければtotal3はnull固定`,
+- grade: 表のタイトルや右上などから学年を読み取る（例：「4年」→「小4」、「5年」→「小5」、「6年」→「小6」）。不明な場合はnull
+- round: 「第X回」を読み取る（例：「第4回」）。不明な場合はnull
+- year: 西暦4桁（例：「2025」）。表中や年度から読み取る。不明な場合はnull
+- rowsは偏差値降順で全行
+- 範囲は[最小,最大]、単一値は[n,n]、空欄はnull
+- averagesは「平均」行から取得
+- 存在しない列はnull固定
+- スペース・改行を最小限にしてコンパクトに出力`,
             },
           ],
         }],
@@ -59,9 +58,24 @@ serve(async (req) => {
 
     const data = await response.json();
     const text = (data.content?.[0]?.text || '').trim();
+
+    // JSON部分を抽出
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('JSONが抽出できませんでした: ' + text.slice(0, 200));
-    const result = JSON.parse(jsonMatch[0]);
+
+    let jsonStr = jsonMatch[0];
+
+    // 末尾が切れている場合の補完
+    const openBrackets = (jsonStr.match(/\[/g) || []).length;
+    const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+    const openBraces = (jsonStr.match(/\{/g) || []).length;
+    const closeBraces = (jsonStr.match(/\}/g) || []).length;
+    // 不完全な末尾行を除去してから閉じる
+    jsonStr = jsonStr.replace(/,\s*\{[^}]*$/, '');
+    for (let i = 0; i < openBrackets - closeBrackets; i++) jsonStr += ']';
+    for (let i = 0; i < openBraces - closeBraces; i++) jsonStr += '}';
+
+    const result = JSON.parse(jsonStr);
 
     return new Response(JSON.stringify(result), {
       headers: { ...cors, 'Content-Type': 'application/json' },
