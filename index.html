@@ -958,8 +958,8 @@ async function pullFromSupabase() {
         renderTestRecords();
       }
     }
-    // 志望校マスタ：Supabaseを正とし、ローカルを完全上書き
-    if (sc) {
+    // 志望校マスタ：Supabaseにデータがあればローカルを完全上書き（なければローカル維持）
+    if (sc && sc.length) {
       localStorage.setItem('targetSchools', JSON.stringify(sc.map(fromSchoolRow)));
       renderSchoolList();
     }
