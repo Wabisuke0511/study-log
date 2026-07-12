@@ -1844,7 +1844,7 @@ function renderDeviationChart() {
       },
       scales: {
         y: {
-          min: 45, max: 65,
+          min: 45, max: 70,
           ticks: { stepSize: 5 }, grid: { color: '#f0f0f0' },
         },
         x: { grid: { display: false }, ticks: { font: { size: 11 } } }
@@ -1925,7 +1925,7 @@ function renderSubjectCharts() {
         responsive: true, maintainAspectRatio: true,
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `偏差値: ${ctx.parsed.y}` } } },
         scales: {
-          y: { min: 45, max: 65, ticks: { stepSize: 5 }, grid: { color: '#f0f0f0' } },
+          y: { min: 45, max: 70, ticks: { stepSize: 5 }, grid: { color: '#f0f0f0' } },
           x: { grid: { display: false }, ticks: { font: { size: 11 } } }
         }
       }
