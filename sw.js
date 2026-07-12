@@ -15,16 +15,17 @@ self.addEventListener('activate', e =>
   )
 );
 
-// ネットワーク優先：
-//   ① まずネットから取得 → 成功したらキャッシュを更新して返す
-//   ② ネットが繋がらない（オフライン）ときだけキャッシュを返す
-self.addEventListener('fetch', e =>
+// ネットワーク優先（同一オリジンのみ）：
+//   外部API（Supabase等）は SW を素通りさせる
+self.addEventListener('fetch', e => {
+  if (!e.request.url.startsWith(self.location.origin)) return;
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
         return res;
       })
       .catch(() => caches.match(e.request))
-  )
-);
+  );
+});
