@@ -809,6 +809,15 @@
         <input type="text" class="text-input" id="schoolNameInput" placeholder="例：早稲田中学校" maxlength="30" />
       </div>
       <div class="form-group">
+        <label>コース / 入試区分（任意）</label>
+        <input type="text" class="text-input" id="schoolCourseInput" placeholder="例：第1回・2科・特進コース" maxlength="30" />
+      </div>
+      <button class="btn" id="aiDeviationBtn" onclick="fetchDeviationByAI()"
+        style="width:100%;margin-bottom:6px;background:var(--bg);border:1.5px solid var(--border);color:var(--text);font-size:15px;">
+        🔍 AI で偏差値を自動取得
+      </button>
+      <p id="aiDeviationNote" style="font-size:12px;color:var(--text-secondary);margin:0 0 12px;line-height:1.6;display:none;"></p>
+      <div class="form-group">
         <label>目標偏差値（4教科総合）</label>
         <div class="time-input-row">
           <input type="number" id="schoolDeviationFrom" min="30" max="80" step="0.1" placeholder="60" />
@@ -1837,9 +1846,11 @@ function addOrUpdateSchool() {
     cancelEditSchool();
   } else {
     schools.push({ id: Date.now(), name, targetDeviationFrom: from, targetDeviationTo: to });
-    document.getElementById('schoolNameInput').value      = '';
+    document.getElementById('schoolNameInput').value       = '';
+    document.getElementById('schoolCourseInput').value    = '';
     document.getElementById('schoolDeviationFrom').value  = '';
     document.getElementById('schoolDeviationTo').value    = '';
+    document.getElementById('aiDeviationNote').style.display = 'none';
   }
   saveTargetSchools(schools);
   renderSchoolList();
@@ -1862,8 +1873,44 @@ function cancelEditSchool() {
   document.getElementById('schoolEditBanner').style.display = 'none';
   document.getElementById('schoolSubmitBtn').textContent    = '追加する';
   document.getElementById('schoolNameInput').value         = '';
+  document.getElementById('schoolCourseInput').value       = '';
   document.getElementById('schoolDeviationFrom').value     = '';
   document.getElementById('schoolDeviationTo').value       = '';
+  document.getElementById('aiDeviationNote').style.display = 'none';
+}
+
+async function fetchDeviationByAI() {
+  const name   = document.getElementById('schoolNameInput').value.trim();
+  const course = document.getElementById('schoolCourseInput').value.trim();
+  if (!name) { alert('先に学校名を入力してください'); return; }
+
+  const btn    = document.getElementById('aiDeviationBtn');
+  const noteEl = document.getElementById('aiDeviationNote');
+  btn.textContent = '🔍 調べています…';
+  btn.disabled = true;
+  noteEl.style.display = 'none';
+
+  try {
+    const { data, error } = await sb.functions.invoke('school-deviation', {
+      body: { schoolName: name, course }
+    });
+    if (error) throw error;
+    if (data && data.error) throw new Error(data.error);
+
+    document.getElementById('schoolDeviationFrom').value = data.from;
+    document.getElementById('schoolDeviationTo').value   = data.to;
+
+    if (data.note) {
+      noteEl.textContent  = `📊 ${data.note}`;
+      noteEl.style.display = 'block';
+    }
+  } catch (e) {
+    alert('偏差値の取得に失敗しました。\nSupabase Edge Function が設定されているか確認してください。');
+    console.warn('fetchDeviationByAI:', e);
+  } finally {
+    btn.textContent = '🔍 AI で偏差値を自動取得';
+    btn.disabled = false;
+  }
 }
 
 function deleteSchool(id) {
