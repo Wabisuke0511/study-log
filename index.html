@@ -841,7 +841,76 @@
       <div class="total-badge" id="schoolTotalBadge"></div>
     </div>
     <div id="schoolList"></div>
-  </div><!-- /panel-settings -->
+
+    <!-- 偏差値マスタカード -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">📊 偏差値マスタ</div>
+      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">評価表の画像からスコア→偏差値の換算表を登録します。登録後はテスト入力時に偏差値が自動計算されます。</p>
+      <button class="btn btn-primary" onclick="openDmModal()" style="width:100%">＋ マスタを追加</button>
+      <div id="devMasterList" style="margin-top:12px"></div>
+    </div>
+  </div><!-- /panel-settings end of school section -->
+
+  <!-- ===== 偏差値マスタ（設定タブ内） ===== -->
+  <div class="tab-panel" id="panel-settings-devmaster" style="display:none"><!-- 常に panel-settings 内に描画 --></div>
+
+  <!-- 偏差値マスタモーダル -->
+  <div class="modal-overlay hidden" id="devMasterModal">
+    <div class="modal" style="max-width:480px;width:100%">
+      <div class="modal-emoji">📊</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:16px">偏差値マスタを追加</div>
+
+      <div class="form-group">
+        <label>学年</label>
+        <select id="dm_grade" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:15px">
+          <option value="小4">小4</option>
+          <option value="小5">小5</option>
+          <option value="小6">小6</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>回</label>
+        <select id="dm_round" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:15px">
+          <option value="第1回">第1回</option><option value="第2回">第2回</option>
+          <option value="第3回">第3回</option><option value="第4回">第4回</option>
+          <option value="第5回">第5回</option><option value="第6回">第6回</option>
+          <option value="第7回">第7回</option><option value="第8回">第8回</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>年度</label>
+        <input type="number" id="dm_year" min="2020" max="2099" placeholder="2025" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:15px;box-sizing:border-box" />
+      </div>
+
+      <div class="form-group">
+        <label>評価表の画像</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;border:1.5px dashed var(--border);border-radius:12px;cursor:pointer;font-size:14px">
+            📁 ファイル選択
+            <input type="file" id="dm_fileInput" accept="image/*" style="display:none" onchange="onDmFileSelected(this)" />
+          </label>
+          <label style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:12px;border:1.5px dashed var(--border);border-radius:12px;cursor:pointer;font-size:14px">
+            📷 カメラ撮影
+            <input type="file" id="dm_cameraInput" accept="image/*" capture="environment" style="display:none" onchange="onDmFileSelected(this)" />
+          </label>
+        </div>
+        <div id="dm_preview" style="display:none;margin-bottom:8px">
+          <img id="dm_previewImg" style="max-width:100%;border-radius:8px;max-height:200px;object-fit:contain" />
+        </div>
+      </div>
+
+      <div id="dm_extractStatus" style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;min-height:20px"></div>
+      <div id="dm_extractResult" style="display:none;background:var(--bg);border-radius:10px;padding:12px;margin-bottom:12px;font-size:12px;max-height:150px;overflow-y:auto">
+        <div id="dm_resultText"></div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1" onclick="closeDmModal()">キャンセル</button>
+        <button class="btn" id="dm_extractBtn" style="flex:1;background:var(--bg);border:1.5px solid var(--border)" onclick="extractDeviationFromImage()" disabled>🔍 AI解析</button>
+        <button class="btn btn-primary" id="dm_saveBtn" style="flex:1" onclick="saveDmMaster()" disabled>保存</button>
+      </div>
+    </div>
+  </div>
 
 </main>
 
@@ -1318,6 +1387,7 @@ function calcTotalScore() {
     if (v !== null) { total += v; count++; }
   }
   document.getElementById('totalScoreDisplay').textContent = count > 0 ? total + '点' : '－';
+  autoCalcDeviation();
 }
 
 // フォームから1教科分のデータを読み取る
@@ -2134,6 +2204,177 @@ document.addEventListener('visibilitychange', () => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(console.warn);
 }
+
+// =====================================================
+//  偏差値マスタ
+// =====================================================
+const DEVIATION_MASTER_SUPABASE_URL = `${SUPABASE_URL}/functions/v1/extract-deviation`;
+
+function loadDeviationMasters() { return JSON.parse(localStorage.getItem('deviationMasters') || '[]'); }
+function saveDeviationMasters(d) { localStorage.setItem('deviationMasters', JSON.stringify(d)); }
+
+function dmKey(grade, round, year) { return `${grade}-${round}-${year}`; }
+
+function findDeviationMaster(grade, round, year) {
+  return loadDeviationMasters().find(m => m.id === dmKey(grade, round, year)) || null;
+}
+
+// スコアから偏差値を逆引き
+function lookupDeviation(master, subject, score) {
+  if (!master || score === null || score === undefined) return null;
+  for (const row of master.rows) {
+    const range = row[subject];
+    if (!range) continue;
+    const [mn, mx] = range;
+    if (mn !== null && mx !== null && score >= mn && score <= mx) return row.dev;
+  }
+  return null;
+}
+
+// テストフォームの偏差値を自動計算して埋める
+function autoCalcDeviation() {
+  const grade = document.getElementById('testGradeInput')?.value;
+  const round = document.getElementById('testRoundInput')?.value;
+  const year  = document.getElementById('testYearInput')?.value?.trim();
+  if (!grade || !round || !year) return;
+  const master = findDeviationMaster(grade, round, year);
+  if (!master) return;
+
+  const scores = {};
+  let total4 = 0, total4count = 0;
+  for (const s of TEST_SUBJECTS) {
+    const sc = parseNum(document.getElementById('score_' + s.key).value);
+    scores[s.key] = sc;
+    if (sc !== null) { total4 += sc; total4count++; }
+  }
+
+  for (const s of TEST_SUBJECTS) {
+    const dev = lookupDeviation(master, s.key, scores[s.key]);
+    if (dev !== null) document.getElementById('deviation_' + s.key).value = dev;
+  }
+
+  // 4教科合計から総合偏差値
+  if (total4count === TEST_SUBJECTS.length) {
+    const totalDev = lookupDeviation(master, 'total4', total4);
+    if (totalDev !== null) document.getElementById('totalDeviationInput').value = totalDev;
+  }
+}
+
+// ---- モーダル操作 ----
+let _dmImageBase64 = null;
+let _dmMediaType = null;
+let _dmExtracted = null;
+
+function openDmModal() {
+  _dmImageBase64 = null; _dmMediaType = null; _dmExtracted = null;
+  document.getElementById('dm_fileInput').value = '';
+  document.getElementById('dm_cameraInput').value = '';
+  document.getElementById('dm_preview').style.display = 'none';
+  document.getElementById('dm_extractStatus').textContent = '';
+  document.getElementById('dm_extractResult').style.display = 'none';
+  document.getElementById('dm_extractBtn').disabled = true;
+  document.getElementById('dm_saveBtn').disabled = true;
+  document.getElementById('dm_year').value = new Date().getFullYear();
+  document.getElementById('devMasterModal').classList.remove('hidden');
+}
+
+function closeDmModal() {
+  document.getElementById('devMasterModal').classList.add('hidden');
+}
+
+function onDmFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _dmMediaType = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    const dataUrl = e.target.result;
+    _dmImageBase64 = dataUrl.split(',')[1];
+    document.getElementById('dm_previewImg').src = dataUrl;
+    document.getElementById('dm_preview').style.display = 'block';
+    document.getElementById('dm_extractBtn').disabled = false;
+    document.getElementById('dm_extractStatus').textContent = '画像を選択しました。AI解析ボタンを押してください。';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function extractDeviationFromImage() {
+  if (!_dmImageBase64) return;
+  const btn = document.getElementById('dm_extractBtn');
+  btn.disabled = true;
+  document.getElementById('dm_extractStatus').textContent = '🔄 AI解析中...（数秒かかります）';
+  document.getElementById('dm_extractResult').style.display = 'none';
+  document.getElementById('dm_saveBtn').disabled = true;
+
+  try {
+    const res = await fetch(DEVIATION_MASTER_SUPABASE_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'apikey': SUPABASE_KEY,
+      },
+      body: JSON.stringify({ imageBase64: _dmImageBase64, mediaType: _dmMediaType }),
+    });
+    if (!res.ok) {
+      const b = await res.json().catch(() => ({}));
+      throw new Error(b.error || `HTTP ${res.status}`);
+    }
+    _dmExtracted = await res.json();
+
+    // プレビュー表示
+    const avg = _dmExtracted.averages || {};
+    const preview = `平均点: 算数${avg.sansu??'－'} 国語${avg.kokugo??'－'} 理科${avg.rika??'－'} 社会${avg.shakai??'－'} 4教科${avg.total4??'－'}\n行数: ${(_dmExtracted.rows||[]).length}行`;
+    document.getElementById('dm_resultText').textContent = preview;
+    document.getElementById('dm_extractResult').style.display = 'block';
+    document.getElementById('dm_extractStatus').textContent = '✅ 解析完了！内容を確認して保存してください。';
+    document.getElementById('dm_saveBtn').disabled = false;
+  } catch(e) {
+    document.getElementById('dm_extractStatus').textContent = '❌ エラー: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function saveDmMaster() {
+  if (!_dmExtracted) return;
+  const grade = document.getElementById('dm_grade').value;
+  const round = document.getElementById('dm_round').value;
+  const year  = document.getElementById('dm_year').value.trim();
+  if (!year) { alert('年度を入力してください'); return; }
+
+  const masters = loadDeviationMasters();
+  const id = dmKey(grade, round, year);
+  const idx = masters.findIndex(m => m.id === id);
+  const entry = { id, grade, round, year, ..._dmExtracted };
+  if (idx >= 0) masters[idx] = entry; else masters.push(entry);
+  saveDeviationMasters(masters);
+  renderDeviationMasterList();
+  closeDmModal();
+}
+
+function deleteDeviationMaster(id) {
+  if (!confirm('このマスタを削除しますか？')) return;
+  saveDeviationMasters(loadDeviationMasters().filter(m => m.id !== id));
+  renderDeviationMasterList();
+}
+
+function renderDeviationMasterList() {
+  const list = document.getElementById('devMasterList');
+  if (!list) return;
+  const masters = loadDeviationMasters();
+  if (!masters.length) { list.innerHTML = '<p style="font-size:13px;color:var(--text-secondary);margin:0">まだ登録がありません</p>'; return; }
+  list.innerHTML = masters.map(m => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;font-size:14px">
+      <div>
+        <span style="font-weight:600">${m.grade} ${m.round} ${m.year}年</span>
+        <span style="font-size:12px;color:var(--text-secondary);margin-left:8px">${(m.rows||[]).length}行</span>
+      </div>
+      <button onclick="deleteDeviationMaster('${m.id}')" style="background:none;border:none;color:#e03131;font-size:18px;cursor:pointer;padding:4px">🗑</button>
+    </div>`).join('');
+}
+
+renderDeviationMasterList();
 </script>
 </body>
 </html>
