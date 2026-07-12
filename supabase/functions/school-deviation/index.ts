@@ -376,6 +376,15 @@ const SCHOOL_LIST = `1: 愛光中学校
 767: 和洋九段女子中学校
 768: 和洋国府台女子中学校`;
 
+function getSchoolNameByCode(code: number): string {
+  for (const line of SCHOOL_LIST.split('\n')) {
+    const idx = line.indexOf(': ');
+    if (idx === -1) continue;
+    if (parseInt(line.substring(0, idx)) === code) return line.substring(idx + 2);
+  }
+  return '';
+}
+
 async function findCodeByClaude(schoolName: string): Promise<number | null> {
   const res = await claudeCall(
     `以下の中学校リスト（形式: コード番号: 学校名）から「${schoolName}」に最も近い学校のコード番号を返してください。
@@ -470,8 +479,9 @@ serve(async (req) => {
       );
     }
 
+    const schoolName = getSchoolNameByCode(code);
     return new Response(
-      JSON.stringify({ code, entries }),
+      JSON.stringify({ code, schoolName, entries }),
       { headers: { ...cors, 'Content-Type': 'application/json' } }
     );
   } catch (err) {

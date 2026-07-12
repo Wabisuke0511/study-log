@@ -1912,12 +1912,13 @@ async function fetchDeviationByAI() {
     const entries = data.entries || [];
     if (entries.length === 0) throw new Error('偏差値データなし');
 
+    // 正式校名をフォームに反映
+    if (data.schoolName) document.getElementById('schoolNameInput').value = data.schoolName;
+
     if (entries.length === 1) {
-      // 1回のみ → 即時入力
       applyDeviationEntry(entries[0]);
       noteEl.innerHTML = `📊 <b>${data.schoolName}</b>｜出典：四谷大塚ドットコム`;
     } else {
-      // 複数回 → 選択ボタンを表示
       noteEl.innerHTML =
         `<span style="display:block;margin-bottom:6px;">📊 <b>${data.schoolName}</b>（出典：四谷大塚）｜入試回を選んでください：</span>` +
         entries.map((e, i) =>
