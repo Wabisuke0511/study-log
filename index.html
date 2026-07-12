@@ -964,10 +964,21 @@ async function pullFromSupabase() {
     // テスト記録
     if (td && td.length) {
       const local = loadTestData();
-      const ids = new Set(local.map(e => e.id));
-      const toAdd = td.filter(e => !ids.has(Number(e.id))).map(fromTestRow);
-      if (toAdd.length) {
-        localStorage.setItem('testEntries', JSON.stringify([...local, ...toAdd]));
+      const localMap = new Map(local.map(e => [e.id, e]));
+      let changed = false;
+      for (const r of td) {
+        const remote = fromTestRow(r);
+        const existing = localMap.get(remote.id);
+        if (!existing) {
+          localMap.set(remote.id, remote);
+          changed = true;
+        } else if (existing.totalDeviation == null && remote.totalDeviation != null) {
+          existing.totalDeviation = remote.totalDeviation;
+          changed = true;
+        }
+      }
+      if (changed) {
+        localStorage.setItem('testEntries', JSON.stringify([...localMap.values()]));
         renderTestRecords();
       }
     }
@@ -1684,7 +1695,7 @@ function renderDeviationChart() {
     borderColor: '#ae3ec9',
     borderWidth: 2,
     borderRadius: 4,
-    order: 2,
+    order: 0,
   });
 
   // 早稲アカSSランク基準ライン（56・実線）
@@ -1699,7 +1710,7 @@ function renderDeviationChart() {
     tension: 0,
     fill: false,
     spanGaps: true,
-    order: 0,
+    order: 1,
   });
 
   // 志望校の目標偏差値ライン（C50・A80 を別々の線で表示）
@@ -1721,7 +1732,7 @@ function renderDeviationChart() {
       tension: 0,
       fill: false,
       spanGaps: true,
-      order: 0,
+      order: 1,
     });
     // Aライン80（合格率80%）― 太い破線
     datasets.push({
@@ -1737,7 +1748,7 @@ function renderDeviationChart() {
       tension: 0,
       fill: false,
       spanGaps: true,
-      order: 0,
+      order: 1,
     });
   });
 
