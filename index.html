@@ -1679,6 +1679,7 @@ function renderDeviationChart() {
   datasets.push({
     type: 'bar',
     label: '総合',
+    hidden: false,
     data: groups.map(g => (g.totalDeviation !== null && g.totalDeviation !== undefined) ? g.totalDeviation : null),
     backgroundColor: '#ae3ec944',
     borderColor: '#ae3ec9',
@@ -1691,6 +1692,7 @@ function renderDeviationChart() {
   datasets.push({
     type: 'line',
     label: '🎯 早稲アカSS (56)',
+    hidden: false,
     data: groups.map(() => 56),
     borderColor: '#e67700',
     backgroundColor: 'transparent',
@@ -1712,6 +1714,7 @@ function renderDeviationChart() {
     datasets.push({
       type: 'line',
       label: `🏫 ${school.name} C50`,
+      hidden: false,
       data: groups.map(() => c50),
       borderColor: color + '99',
       backgroundColor: 'transparent',
@@ -1727,6 +1730,7 @@ function renderDeviationChart() {
     datasets.push({
       type: 'line',
       label: `🏫 ${school.name} A80`,
+      hidden: true,
       data: groups.map(() => a80),
       borderColor: color,
       backgroundColor: 'transparent',
@@ -1761,12 +1765,6 @@ function renderDeviationChart() {
     }
   });
 
-  // デフォルト表示：総合・C50・早稲アカSSはON、A80はOFF
-  datasets.forEach((ds, i) => {
-    const on = ds.label === '総合' || ds.label.includes('C50') || ds.label.includes('早稲アカSS');
-    chartDeviationInstance.setDatasetVisibility(i, on);
-  });
-  chartDeviationInstance.update();
 
   // トグルチェックボックスを動的生成
   document.getElementById('deviationToggleLegend').innerHTML = datasets.map((ds, i) => {
