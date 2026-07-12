@@ -761,6 +761,9 @@
     <!-- グラフ①：偏差値の推移 -->
     <div class="card">
       <div class="card-title">📐 偏差値の推移</div>
+      <select id="deviationRoundSelect" onchange="renderDeviationChart()"
+        style="width:100%;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;margin-bottom:10px;">
+      </select>
       <div id="deviationToggleLegend" style="display:flex;flex-wrap:wrap;gap:4px 8px;margin-bottom:8px;"></div>
       <div id="deviationChartWrap"><div class="chart-wrap"><canvas id="chartDeviation"></canvas></div></div>
     </div>
@@ -1642,14 +1645,27 @@ function renderScoreChart() {
 
 // ── グラフ①：偏差値推移（折れ線）＋志望校目標ライン
 function renderDeviationChart() {
-  const groups = getTestGroups();
-  if (!groups.length) {
+  const all = getTestGroups();
+  if (!all.length) {
     document.getElementById('deviationChartWrap').innerHTML =
       `<div class="empty-state" style="padding:24px 0"><div class="empty-state-emoji">📐</div><p>テスト記録を追加すると<br>偏差値の推移が表示されます</p></div>`;
     document.getElementById('deviationToggleLegend').innerHTML = '';
+    document.getElementById('deviationRoundSelect').innerHTML = '';
     return;
   }
-  const labels = groups.map(g => `${g.grade ? g.grade+' ' : ''}${g.round}`);
+
+  // ドロップダウン：ユニークな回名リスト（学年＋回）
+  const roundKeys = [...new Set(all.map(g => `${g.grade ? g.grade+' ' : ''}${g.round}`))];
+  const sel = document.getElementById('deviationRoundSelect');
+  const prevVal = sel.value;
+  sel.innerHTML = roundKeys.map(k => `<option value="${k}"${k===prevVal?'selected':''}>${k}</option>`).join('');
+  const selectedRound = sel.value || roundKeys[0];
+
+  // 選択された回でフィルタし、年度順に並べる
+  const groups = all
+    .filter(g => `${g.grade ? g.grade+' ' : ''}${g.round}` === selectedRound)
+    .sort((a, b) => (a.year || '').localeCompare(b.year || ''));
+  const labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
 
   // 4教科の偏差値ライン
   const datasets = TEST_SUBJECTS.map(s => ({
