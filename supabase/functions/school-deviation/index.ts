@@ -16,7 +16,7 @@ const BROWSER_HEADERS = {
 };
 
 async function fetchSchoolListText(): Promise<string> {
-  const res = await fetch(`${BASE}/`, { headers: BROWSER_HEADERS });
+  const res = await fetch(`${BASE}/index.php`, { headers: BROWSER_HEADERS });
   if (!res.ok) throw new Error(`school list fetch: ${res.status}`);
   const html = await res.text();
   const lines: string[] = [];
