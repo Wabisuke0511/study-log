@@ -2317,24 +2317,45 @@ async function extractDeviationFromImage() {
     }
     _dmExtracted = await res.json();
 
-    // 学年・回・年度を自動入力
-    if (_dmExtracted.grade) {
-      const gradeEl = document.getElementById('dm_grade');
-      const opt = [...gradeEl.options].find(o => o.value === _dmExtracted.grade);
-      if (opt) gradeEl.value = _dmExtracted.grade;
+    // 学年・回・年度を自動入力＋未検出フィールドをハイライト
+    const gradeEl = document.getElementById('dm_grade');
+    const roundEl = document.getElementById('dm_round');
+    const yearEl  = document.getElementById('dm_year');
+    const RED = '2px solid #e03131';
+    const NONE = '';
+
+    if (_dmExtracted.grade && [...gradeEl.options].find(o => o.value === _dmExtracted.grade)) {
+      gradeEl.value = _dmExtracted.grade;
+      gradeEl.style.border = NONE;
+    } else {
+      gradeEl.style.border = RED;
     }
-    if (_dmExtracted.round) {
-      const roundEl = document.getElementById('dm_round');
-      const opt = [...roundEl.options].find(o => o.value === _dmExtracted.round);
-      if (opt) roundEl.value = _dmExtracted.round;
+    if (_dmExtracted.round && [...roundEl.options].find(o => o.value === _dmExtracted.round)) {
+      roundEl.value = _dmExtracted.round;
+      roundEl.style.border = NONE;
+    } else {
+      roundEl.style.border = RED;
     }
-    if (_dmExtracted.year) document.getElementById('dm_year').value = _dmExtracted.year;
+    if (_dmExtracted.year) {
+      yearEl.value = _dmExtracted.year;
+      yearEl.style.border = NONE;
+    } else {
+      yearEl.style.border = RED;
+    }
+
+    const undetected = [
+      !_dmExtracted.grade  && '学年',
+      !_dmExtracted.round  && '回',
+      !_dmExtracted.year   && '年度',
+    ].filter(Boolean);
 
     const avg = _dmExtracted.averages || {};
     document.getElementById('dm_resultText').textContent =
-      `学年: ${_dmExtracted.grade??'不明'} / 回: ${_dmExtracted.round??'不明'} / 年度: ${_dmExtracted.year??'不明'}\n平均点: 算数${avg.sansu??'－'} 国語${avg.kokugo??'－'} 理科${avg.rika??'－'} 社会${avg.shakai??'－'} 4教科${avg.total4??'－'}\n行数: ${(_dmExtracted.rows||[]).length}行`;
+      `平均点: 算数${avg.sansu??'－'} 国語${avg.kokugo??'－'} 理科${avg.rika??'－'} 社会${avg.shakai??'－'} 4教科${avg.total4??'－'} / 行数: ${(_dmExtracted.rows||[]).length}行`;
     document.getElementById('dm_extractResult').style.display = 'block';
-    document.getElementById('dm_extractStatus').textContent = '✅ 解析完了！内容を確認して保存してください。';
+    document.getElementById('dm_extractStatus').textContent = undetected.length
+      ? `⚠️ 解析完了。${undetected.join('・')}を手動で入力してください。`
+      : '✅ 解析完了！内容を確認して保存してください。';
     document.getElementById('dm_saveBtn').disabled = false;
   } catch(e) {
     document.getElementById('dm_extractStatus').textContent = '❌ エラー: ' + e.message;
