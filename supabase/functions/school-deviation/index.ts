@@ -23,7 +23,19 @@ async function fetchSchoolListText(): Promise<string> {
 // Step2: Claude で学校名を曖昧マッチングしてコードを返す
 async function findCodeByClaude(schoolName: string, schoolList: string): Promise<number | null> {
   const res = await claudeCall(
-    `以下の中学校リスト（形式: コード番号: 学校名）から「${schoolName}」に最も近い学校のコード番号のみを返してください。数字だけ返してください。見つからない場合は 0 を返してください。\n\n${schoolList}`,
+    `以下の中学校リスト（形式: コード番号: 学校名）から「${schoolName}」に一致する学校のコード番号を返してください。
+
+マッチングルール:
+- 完全一致を最優先
+- 地名（所沢・日本橋・千葉など）が含まれる場合は必ずその地名も一致させる
+- 「中学校」「中等部」「中等教育学校」などの違いは無視してよい
+- 同じ法人名の学校が複数ある場合は地名・コース名で区別する
+- 数字のみ返す。見つからない場合は 0 を返す。
+
+検索: 「${schoolName}」
+
+リスト:
+${schoolList}`,
     16
   );
   const num = parseInt(res.trim());
