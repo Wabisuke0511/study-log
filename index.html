@@ -1902,7 +1902,11 @@ async function fetchDeviationByAI() {
     const { data, error } = await sb.functions.invoke('school-deviation', {
       body: { schoolName: name }
     });
-    if (error) throw error;
+    if (error) {
+      let msg = error.message;
+      try { const b = await error.context.json(); msg = b.error || msg; } catch {}
+      throw new Error(msg);
+    }
     if (data && data.error) throw new Error(data.error);
 
     const entries = data.entries || [];
