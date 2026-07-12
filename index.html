@@ -814,7 +814,7 @@
       </div>
       <button class="btn" id="aiDeviationBtn" onclick="fetchDeviationByAI()"
         style="width:100%;margin-bottom:6px;background:var(--bg);border:1.5px solid var(--border);color:var(--text);font-size:15px;">
-        🔍 AI で偏差値を自動取得
+        🔍 四谷大塚から偏差値を取得
       </button>
       <p id="aiDeviationNote" style="font-size:12px;color:var(--text-secondary);margin:0 0 12px;line-height:1.6;display:none;"></p>
       <div class="form-group">
@@ -1880,8 +1880,7 @@ function cancelEditSchool() {
 }
 
 async function fetchDeviationByAI() {
-  const name   = document.getElementById('schoolNameInput').value.trim();
-  const course = document.getElementById('schoolCourseInput').value.trim();
+  const name = document.getElementById('schoolNameInput').value.trim();
   if (!name) { alert('先に学校名を入力してください'); return; }
 
   const btn    = document.getElementById('aiDeviationBtn');
@@ -1889,28 +1888,46 @@ async function fetchDeviationByAI() {
   btn.textContent = '🔍 調べています…';
   btn.disabled = true;
   noteEl.style.display = 'none';
+  noteEl.innerHTML = '';
 
   try {
     const { data, error } = await sb.functions.invoke('school-deviation', {
-      body: { schoolName: name, course }
+      body: { schoolName: name }
     });
     if (error) throw error;
     if (data && data.error) throw new Error(data.error);
 
-    document.getElementById('schoolDeviationFrom').value = data.from;
-    document.getElementById('schoolDeviationTo').value   = data.to;
+    const entries = data.entries || [];
+    if (entries.length === 0) throw new Error('偏差値データなし');
 
-    if (data.note) {
-      noteEl.textContent  = `📊 ${data.note}`;
-      noteEl.style.display = 'block';
+    if (entries.length === 1) {
+      // 1回のみ → 即時入力
+      applyDeviationEntry(entries[0]);
+      noteEl.innerHTML = `📊 <b>${data.schoolName}</b>｜出典：四谷大塚ドットコム`;
+    } else {
+      // 複数回 → 選択ボタンを表示
+      noteEl.innerHTML =
+        `<span style="display:block;margin-bottom:6px;">📊 <b>${data.schoolName}</b>（出典：四谷大塚）｜入試回を選んでください：</span>` +
+        entries.map((e, i) =>
+          `<button onclick="applyDeviationEntry(${JSON.stringify(e).replace(/"/g,"'")})"
+            style="margin:3px 4px 3px 0;padding:5px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;cursor:pointer;">
+            ${e.round}｜C50: ${e.c50} / A80: ${e.a80}
+          </button>`
+        ).join('');
     }
+    noteEl.style.display = 'block';
   } catch (e) {
-    alert('偏差値の取得に失敗しました。\nSupabase Edge Function が設定されているか確認してください。');
+    alert('偏差値の取得に失敗しました。\n' + e.message);
     console.warn('fetchDeviationByAI:', e);
   } finally {
-    btn.textContent = '🔍 AI で偏差値を自動取得';
+    btn.textContent = '🔍 四谷大塚から偏差値を取得';
     btn.disabled = false;
   }
+}
+
+function applyDeviationEntry(entry) {
+  document.getElementById('schoolDeviationFrom').value = entry.c50;
+  document.getElementById('schoolDeviationTo').value   = entry.a80;
 }
 
 function deleteSchool(id) {
