@@ -1679,8 +1679,7 @@ function renderDeviationChart() {
   datasets.push({
     type: 'bar',
     label: '総合',
-    hidden: false,
-    data: groups.map(g => (g.totalDeviation !== null && g.totalDeviation !== undefined) ? g.totalDeviation : null),
+    data: groups.map(g => (g.totalDeviation !== null && g.totalDeviation !== undefined && g.totalDeviation !== 0) ? g.totalDeviation : null),
     backgroundColor: '#ae3ec944',
     borderColor: '#ae3ec9',
     borderWidth: 2,
@@ -1692,7 +1691,6 @@ function renderDeviationChart() {
   datasets.push({
     type: 'line',
     label: '🎯 早稲アカSS (56)',
-    hidden: false,
     data: groups.map(() => 56),
     borderColor: '#e67700',
     backgroundColor: 'transparent',
@@ -1714,7 +1712,6 @@ function renderDeviationChart() {
     datasets.push({
       type: 'line',
       label: `🏫 ${school.name} C50`,
-      hidden: false,
       data: groups.map(() => c50),
       borderColor: color + '99',
       backgroundColor: 'transparent',
