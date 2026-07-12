@@ -1916,17 +1916,20 @@ async function fetchDeviationByAI() {
     if (data.schoolName) document.getElementById('schoolNameInput').value = data.schoolName;
 
     if (entries.length === 1) {
-      applyDeviationEntry(entries[0]);
+      applyDeviationEntry(entries[0], data.schoolName);
       noteEl.innerHTML = `📊 <b>${data.schoolName}</b>｜出典：四谷大塚ドットコム`;
     } else {
+      const base = data.schoolName || '';
       noteEl.innerHTML =
-        `<span style="display:block;margin-bottom:6px;">📊 <b>${data.schoolName}</b>（出典：四谷大塚）｜入試回を選んでください：</span>` +
-        entries.map((e, i) =>
-          `<button onclick="applyDeviationEntry(${JSON.stringify(e).replace(/"/g,"'")})"
+        `<span style="display:block;margin-bottom:6px;">📊 <b>${base}</b>（出典：四谷大塚）｜入試回を選んでください：</span>` +
+        entries.map((e) => {
+          const safeEntry = JSON.stringify(e).replace(/"/g,"'");
+          const safeName  = base.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+          return `<button onclick="applyDeviationEntry(${safeEntry},'${safeName}')"
             style="margin:3px 4px 3px 0;padding:5px 10px;border-radius:8px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;cursor:pointer;">
             ${e.round}｜C50: ${e.c50} / A80: ${e.a80}
-          </button>`
-        ).join('');
+          </button>`;
+        }).join('');
     }
     noteEl.style.display = 'block';
   } catch (e) {
@@ -1938,9 +1941,14 @@ async function fetchDeviationByAI() {
   }
 }
 
-function applyDeviationEntry(entry) {
+function applyDeviationEntry(entry, baseName) {
   document.getElementById('schoolDeviationFrom').value = entry.c50;
   document.getElementById('schoolDeviationTo').value   = entry.a80;
+  if (entry.round) {
+    const nameEl = document.getElementById('schoolNameInput');
+    const base = baseName || nameEl.value;
+    nameEl.value = `${base}（${entry.round}）`;
+  }
 }
 
 function deleteSchool(id) {
@@ -1998,6 +2006,11 @@ renderStudyRecords();
 renderTestRecords();
 renderSchoolList();
 if (_name) pullFromSupabase();
+
+// タブ・アプリに戻ったとき自動で最新データを取得（デバイス間同期）
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && loadName()) pullFromSupabase();
+});
 
 // Service Worker 登録（ホーム画面追加時のキャッシュ自動更新のため）
 if ('serviceWorker' in navigator) {
