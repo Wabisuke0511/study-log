@@ -761,14 +761,7 @@
     <!-- グラフ①：偏差値の推移 -->
     <div class="card">
       <div class="card-title">📐 偏差値の推移</div>
-      <div class="chart-legend">
-        <span class="legend-item"><span class="legend-dot" style="background:var(--c-kokugo)"></span>国語</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--c-sansu)"></span>算数</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--c-rika)"></span>理科</span>
-        <span class="legend-item"><span class="legend-dot" style="background:var(--c-shakai)"></span>社会</span>
-        <span class="legend-item"><span class="legend-dash" style="border-color:var(--c-total)"></span>総合</span>
-      </div>
-      <div id="deviationSchoolLegend"></div>
+      <div id="deviationToggleLegend" style="display:flex;flex-wrap:wrap;gap:4px 8px;margin-bottom:8px;"></div>
       <div id="deviationChartWrap"><div class="chart-wrap"><canvas id="chartDeviation"></canvas></div></div>
     </div>
 
@@ -1653,7 +1646,7 @@ function renderDeviationChart() {
   if (!groups.length) {
     document.getElementById('deviationChartWrap').innerHTML =
       `<div class="empty-state" style="padding:24px 0"><div class="empty-state-emoji">📐</div><p>テスト記録を追加すると<br>偏差値の推移が表示されます</p></div>`;
-    document.getElementById('deviationSchoolLegend').innerHTML = '';
+    document.getElementById('deviationToggleLegend').innerHTML = '';
     return;
   }
   const labels = groups.map(g => `${g.grade ? g.grade+' ' : ''}${g.round}`);
@@ -1721,17 +1714,6 @@ function renderDeviationChart() {
     });
   });
 
-  // 志望校の凡例を動的に更新
-  document.getElementById('deviationSchoolLegend').innerHTML =
-    schools.length > 0
-      ? `<div class="chart-legend" style="margin-top:2px">${schools.map((s, i) => {
-          const color = SCHOOL_COLORS[i % SCHOOL_COLORS.length];
-          const c50 = s.targetDeviationFrom ?? s.targetDeviation ?? '?';
-          const a80 = s.targetDeviationTo   ?? s.targetDeviation ?? '?';
-          return `<span class="legend-item"><span class="legend-dash" style="border-color:${color}"></span>🏫 ${s.name}｜C50: <b>${c50}</b> / A80: <b>${a80}</b></span>`;
-        }).join('')}</div>`
-      : '';
-
   if (chartDeviationInstance) { chartDeviationInstance.destroy(); chartDeviationInstance = null; }
   document.getElementById('deviationChartWrap').innerHTML = `<div class="chart-wrap"><canvas id="chartDeviation"></canvas></div>`;
   chartDeviationInstance = new Chart(document.getElementById('chartDeviation'), {
@@ -1745,13 +1727,32 @@ function renderDeviationChart() {
       },
       scales: {
         y: {
-          beginAtZero: false, suggestedMin: 30, suggestedMax: 75,
-          ticks: { stepSize: 10 }, grid: { color: '#f0f0f0' },
+          min: 45, max: 65,
+          ticks: { stepSize: 5 }, grid: { color: '#f0f0f0' },
         },
         x: { grid: { display: false }, ticks: { font: { size: 11 } } }
       }
     }
   });
+
+  // トグルチェックボックスを動的生成
+  document.getElementById('deviationToggleLegend').innerHTML = datasets.map((ds, i) => {
+    const color = (ds.borderColor || '#888').replace('99','');
+    const isBar = ds.type === 'bar';
+    const icon = isBar
+      ? `<span style="display:inline-block;width:12px;height:12px;background:${color};border-radius:2px;vertical-align:middle;margin-right:3px;"></span>`
+      : `<span style="display:inline-block;width:16px;height:3px;background:${color};vertical-align:middle;margin-right:3px;border-radius:2px;"></span>`;
+    return `<label style="display:inline-flex;align-items:center;font-size:12px;cursor:pointer;padding:3px 7px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);">
+      <input type="checkbox" checked onchange="toggleDeviationDataset(${i},this.checked)" style="margin-right:4px;accent-color:${color};">
+      ${icon}${ds.label}
+    </label>`;
+  }).join('');
+}
+
+function toggleDeviationDataset(index, visible) {
+  if (!chartDeviationInstance) return;
+  chartDeviationInstance.setDatasetVisibility(index, visible);
+  chartDeviationInstance.update();
 }
 
 // ── グラフ③：解き直し進捗（ドーナツ＋バー）──
