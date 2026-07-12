@@ -818,11 +818,16 @@
       </button>
       <p id="aiDeviationNote" style="font-size:12px;color:var(--text-secondary);margin:0 0 12px;line-height:1.6;display:none;"></p>
       <div class="form-group">
-        <label>目標偏差値（4教科総合）</label>
+        <label>Cライン偏差値 <span style="font-weight:400;font-size:12px;color:var(--text-secondary)">（合格率50%・第一志望の目標）</span></label>
         <div class="time-input-row">
-          <input type="number" id="schoolDeviationFrom" min="30" max="80" step="0.1" placeholder="60" />
-          <span class="time-unit">〜</span>
-          <input type="number" id="schoolDeviationTo" min="30" max="80" step="0.1" placeholder="65" />
+          <input type="number" id="schoolDeviationFrom" min="30" max="80" step="0.1" placeholder="62" />
+          <span class="time-unit" style="white-space:nowrap">（30〜80）</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Aライン偏差値 <span style="font-weight:400;font-size:12px;color:var(--text-secondary)">（合格率80%・安全圏の目標）</span></label>
+        <div class="time-input-row">
+          <input type="number" id="schoolDeviationTo" min="30" max="80" step="0.1" placeholder="66" />
           <span class="time-unit" style="white-space:nowrap">（30〜80）</span>
         </div>
       </div>
@@ -1662,32 +1667,33 @@ function renderDeviationChart() {
     tension: 0.3, spanGaps: false,
   });
 
-  // 志望校の目標偏差値ライン（from〜to を帯で表示）
+  // 志望校の目標偏差値ライン（C50・A80 を別々の線で表示）
   const schools = loadTargetSchools();
   schools.forEach((school, i) => {
     const color = SCHOOL_COLORS[i % SCHOOL_COLORS.length];
-    const from = school.targetDeviationFrom ?? school.targetDeviation;
-    const to   = school.targetDeviationTo   ?? school.targetDeviation;
-    // 下限ライン（fill: '+1' で上限まで塗りつぶす）
+    const c50 = school.targetDeviationFrom ?? school.targetDeviation;
+    const a80 = school.targetDeviationTo   ?? school.targetDeviation;
+    // Cライン50（合格率50%）― 細い点線
     datasets.push({
-      label: `🏫 ${school.name}（${from}〜${to}）`,
-      data: groups.map(() => from),
-      borderColor: color + '70',
-      backgroundColor: color + '18',
+      label: `🏫 ${school.name} C50`,
+      data: groups.map(() => c50),
+      borderColor: color + '99',
+      backgroundColor: 'transparent',
       borderWidth: 1.5,
-      borderDash: [4, 4],
+      borderDash: [3, 4],
       pointRadius: 0,
       tension: 0,
-      fill: '+1',
+      fill: false,
       spanGaps: true,
     });
-    // 上限ライン
+    // Aライン80（合格率80%）― 太い破線
     datasets.push({
-      label: `_${school.name}_to`,
-      data: groups.map(() => to),
+      label: `🏫 ${school.name} A80`,
+      data: groups.map(() => a80),
       borderColor: color,
-      borderWidth: 2,
-      borderDash: [5, 5],
+      backgroundColor: 'transparent',
+      borderWidth: 2.5,
+      borderDash: [8, 4],
       pointRadius: 0,
       tension: 0,
       fill: false,
@@ -1700,9 +1706,9 @@ function renderDeviationChart() {
     schools.length > 0
       ? `<div class="chart-legend" style="margin-top:2px">${schools.map((s, i) => {
           const color = SCHOOL_COLORS[i % SCHOOL_COLORS.length];
-          const from = s.targetDeviationFrom ?? s.targetDeviation ?? '?';
-          const to   = s.targetDeviationTo   ?? s.targetDeviation ?? '?';
-          return `<span class="legend-item"><span class="legend-dash" style="border-color:${color}"></span>🏫 ${s.name}（${from}〜${to}）</span>`;
+          const c50 = s.targetDeviationFrom ?? s.targetDeviation ?? '?';
+          const a80 = s.targetDeviationTo   ?? s.targetDeviation ?? '?';
+          return `<span class="legend-item"><span class="legend-dash" style="border-color:${color}"></span>🏫 ${s.name}｜C50: <b>${c50}</b> / A80: <b>${a80}</b></span>`;
         }).join('')}</div>`
       : '';
 
@@ -1954,7 +1960,7 @@ function renderSchoolList() {
       <div class="record-subject-dot" style="background:${color}22">🏫</div>
       <div class="record-info">
         <div class="record-subject-name">${s.name}</div>
-        <div class="record-date">目標偏差値（4教科総合）：<strong style="color:${color}">${s.targetDeviationFrom ?? s.targetDeviation ?? '?'} 〜 ${s.targetDeviationTo ?? s.targetDeviation ?? '?'}</strong></div>
+        <div class="record-date">C50（50%）：<strong style="color:${color}">${s.targetDeviationFrom ?? s.targetDeviation ?? '?'}</strong>　A80（80%）：<strong style="color:${color}">${s.targetDeviationTo ?? s.targetDeviation ?? '?'}</strong></div>
       </div>
       <button class="edit-btn"   onclick="editSchool(${s.id})">✏️</button>
       <button class="delete-btn" onclick="deleteSchool(${s.id})">🗑</button>

@@ -1,78 +1,85 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
+const BASE = 'https://www.yotsuyaotsuka.com/juken/data';
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const BASE = 'https://www.yotsuyaotsuka.com/juken/data';
-
-async function findSchoolCode(input: string): Promise<{ code: number; name: string } | null> {
+// Step1: 学校リストから「コード: 学校名」テキストを生成
+async function fetchSchoolListText(): Promise<string> {
   const res = await fetch(`${BASE}/`);
-  if (!res.ok) throw new Error(`school list fetch failed: ${res.status}`);
+  if (!res.ok) throw new Error(`school list fetch: ${res.status}`);
   const html = await res.text();
-
-  // Extract links: href="./index.php?code=123...">学校名</a>
-  const re = /href="\.\/index\.php\?code=(\d+)[^"]*"\s*>([^<]+)<\/a>/g;
-  const norm = (s: string) => s.replace(/[\s　]/g, '');
-  const inp = norm(input);
-
-  const candidates: { code: number; name: string; score: number }[] = [];
-
-  for (const m of html.matchAll(re)) {
-    const code = parseInt(m[1]);
-    const name = norm(m[2].trim());
-    let score = 0;
-    if (name === inp) score = 100;
-    else if (name.includes(inp)) score = 80;
-    else if (inp.includes(name) && name.length >= 3) score = 70;
-    else {
-      // Try stripped version (remove common suffixes)
-      const s = inp.replace(/中学校|中等部|女子学院|高等学校|学院|学園/, '');
-      if (s.length >= 2 && name.includes(s)) score = 50;
-    }
-    if (score > 0) candidates.push({ code, name: m[2].trim(), score });
+  const lines: string[] = [];
+  for (const m of html.matchAll(/[?&]code=(\d+)[^"']*['"][^>]*>([^<]{2,30})</g)) {
+    lines.push(`${m[1]}: ${m[2].trim()}`);
   }
-
-  candidates.sort((a, b) => b.score - a.score);
-  return candidates[0] ?? null;
+  return lines.join('\n');
 }
 
+// Step2: Claude で学校名を曖昧マッチングしてコードを返す
+async function findCodeByClaude(schoolName: string, schoolList: string): Promise<number | null> {
+  const res = await claudeCall(
+    `以下の中学校リスト（形式: コード番号: 学校名）から「${schoolName}」に最も近い学校のコード番号のみを返してください。数字だけ返してください。見つからない場合は 0 を返してください。\n\n${schoolList}`,
+    16
+  );
+  const num = parseInt(res.trim());
+  return isNaN(num) || num === 0 ? null : num;
+}
+
+// Step3: 学校詳細ページをテキスト化して Claude で偏差値を抽出
 async function fetchDeviation(code: number): Promise<{ round: string; a80: number; c50: number }[]> {
   const res = await fetch(`${BASE}/index.php?code=${code}`);
-  if (!res.ok) throw new Error(`detail fetch failed: ${res.status}`);
+  if (!res.ok) throw new Error(`detail fetch: ${res.status}`);
   const html = await res.text();
 
-  // Extract A-line 80 values (合格率80%) - avoid matching the "80" in "Aライン80"
-  const a80s = [...html.matchAll(/Aライン[^<]{1,30}偏差値[^<\d]*?([3-8]\d(?:\.\d)?)/g)]
-    .map(m => parseFloat(m[1]));
-  // Extract C-line 50 values (合格率50%)
-  const c50s = [...html.matchAll(/Cライン[^<]{1,30}偏差値[^<\d]*?([3-8]\d(?:\.\d)?)/g)]
-    .map(m => parseFloat(m[1]));
+  // HTMLタグを除去してプレーンテキスト化
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z]+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .substring(0, 4000);
 
-  // Also try to grab date labels for round names
-  const dateRe = /(\d{1,2})月(\d{1,2})日/g;
-  const dates = [...html.matchAll(dateRe)].map(m => `${m[1]}/${m[2]}`);
+  const json = await claudeCall(
+    `以下は四谷大塚の中学校詳細ページのテキストです。
+「Aライン80偏差値」（合格率80%）と「Cライン50偏差値」（合格率50%）を入試回ごとに抽出してください。
 
-  const count = Math.min(a80s.length, c50s.length);
-  const results: { round: string; a80: number; c50: number }[] = [];
+出力形式（JSONのみ、他の説明不要）：
+[{"round":"第1回（2/1）","a80":66,"c50":62}]
 
-  for (let i = 0; i < count; i++) {
-    results.push({
-      round: dates[i] ? `第${i + 1}回（${dates[i]}）` : `第${i + 1}回`,
-      a80: a80s[i],
-      c50: c50s[i],
-    });
-  }
+テキスト:
+${text}`,
+    512
+  );
 
-  // Deduplicate by (a80, c50) pair
-  const seen = new Set<string>();
-  return results.filter(r => {
-    const key = `${r.a80}-${r.c50}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+  const match = json.match(/\[[\s\S]*?\]/);
+  if (!match) throw new Error('deviation JSON not found');
+  return JSON.parse(match[0]);
+}
+
+// Anthropic API 共通呼び出し
+async function claudeCall(prompt: string, maxTokens: number): Promise<string> {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    }),
   });
+  if (!res.ok) throw new Error(`Claude API: ${res.status}`);
+  const data = await res.json();
+  return data.content[0].text;
 }
 
 serve(async (req) => {
@@ -81,16 +88,17 @@ serve(async (req) => {
   try {
     const { schoolName } = await req.json();
 
-    const school = await findSchoolCode(schoolName);
-    if (!school) {
+    const schoolList = await fetchSchoolListText();
+    const code = await findCodeByClaude(schoolName, schoolList);
+    if (!code) {
       return new Response(
-        JSON.stringify({ error: `「${schoolName}」は四谷大塚のデータベースに見つかりませんでした` }),
+        JSON.stringify({ error: `「${schoolName}」に近い学校が見つかりませんでした` }),
         { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } }
       );
     }
 
-    const entries = await fetchDeviation(school.code);
-    if (entries.length === 0) {
+    const entries = await fetchDeviation(code);
+    if (!entries.length) {
       return new Response(
         JSON.stringify({ error: '偏差値データを取得できませんでした' }),
         { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } }
@@ -98,7 +106,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ schoolName: school.name, code: school.code, entries }),
+      JSON.stringify({ code, entries }),
       { headers: { ...cors, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
