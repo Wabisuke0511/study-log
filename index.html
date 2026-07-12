@@ -1660,6 +1660,7 @@ function renderDeviationChart() {
 
   // 4教科の偏差値ライン
   const datasets = TEST_SUBJECTS.map(s => ({
+    type: 'line',
     label: s.label,
     data: groups.map(g => {
       const sub = g.subjects[s.key];
@@ -1667,17 +1668,19 @@ function renderDeviationChart() {
     }),
     borderColor: s.color, backgroundColor: s.color+'22',
     pointBackgroundColor: s.color, pointRadius: 5, pointHoverRadius: 7,
-    tension: 0.3, spanGaps: false,
+    tension: 0.3, spanGaps: false, order: 1,
   }));
 
-  // 総合偏差値（破線で表示）
+  // 総合偏差値（棒グラフ）
   datasets.push({
+    type: 'bar',
     label: '総合',
     data: groups.map(g => (g.totalDeviation !== null && g.totalDeviation !== undefined) ? g.totalDeviation : null),
-    borderColor: '#ae3ec9', backgroundColor: '#ae3ec922',
-    pointBackgroundColor: '#ae3ec9', pointRadius: 6, pointHoverRadius: 8,
-    borderWidth: 2.5, borderDash: [6, 3],
-    tension: 0.3, spanGaps: false,
+    backgroundColor: '#ae3ec944',
+    borderColor: '#ae3ec9',
+    borderWidth: 2,
+    borderRadius: 4,
+    order: 2,
   });
 
   // 志望校の目標偏差値ライン（C50・A80 を別々の線で表示）
@@ -1688,6 +1691,7 @@ function renderDeviationChart() {
     const a80 = school.targetDeviationTo   ?? school.targetDeviation;
     // Cライン50（合格率50%）― 細い点線
     datasets.push({
+      type: 'line',
       label: `🏫 ${school.name} C50`,
       data: groups.map(() => c50),
       borderColor: color + '99',
@@ -1698,9 +1702,11 @@ function renderDeviationChart() {
       tension: 0,
       fill: false,
       spanGaps: true,
+      order: 0,
     });
     // Aライン80（合格率80%）― 太い破線
     datasets.push({
+      type: 'line',
       label: `🏫 ${school.name} A80`,
       data: groups.map(() => a80),
       borderColor: color,
@@ -1711,6 +1717,7 @@ function renderDeviationChart() {
       tension: 0,
       fill: false,
       spanGaps: true,
+      order: 0,
     });
   });
 
@@ -1728,7 +1735,7 @@ function renderDeviationChart() {
   if (chartDeviationInstance) { chartDeviationInstance.destroy(); chartDeviationInstance = null; }
   document.getElementById('deviationChartWrap').innerHTML = `<div class="chart-wrap"><canvas id="chartDeviation"></canvas></div>`;
   chartDeviationInstance = new Chart(document.getElementById('chartDeviation'), {
-    type: 'line', data: { labels, datasets },
+    type: 'bar', data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: true,
       interaction: { mode: 'index', intersect: false },
