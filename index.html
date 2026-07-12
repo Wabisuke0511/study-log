@@ -2206,17 +2206,24 @@ if ('serviceWorker' in navigator) {
 }
 
 // =====================================================
-//  偏差値マスタ
+//  偏差値マスタ（Supabase primary）
 // =====================================================
-const DEVIATION_MASTER_SUPABASE_URL = `${SUPABASE_URL}/functions/v1/extract-deviation`;
+const EXTRACT_DEVIATION_URL = `${SUPABASE_URL}/functions/v1/extract-deviation`;
 
-function loadDeviationMasters() { return JSON.parse(localStorage.getItem('deviationMasters') || '[]'); }
-function saveDeviationMasters(d) { localStorage.setItem('deviationMasters', JSON.stringify(d)); }
+// メモリキャッシュ（ページ内高速参照用）
+let _dmCache = [];
 
 function dmKey(grade, round, year) { return `${grade}-${round}-${year}`; }
 
+// Supabaseから全マスタ取得してキャッシュ更新
+async function fetchDeviationMasters() {
+  const { data, error } = await sb.from('study_deviation_masters').select('*').order('year').order('round');
+  if (error) { console.warn('fetchDeviationMasters:', error.message); return; }
+  _dmCache = (data || []).map(r => ({ id: r.id, grade: r.grade, round: r.round, year: r.year, averages: r.averages, rows: r.rows }));
+}
+
 function findDeviationMaster(grade, round, year) {
-  return loadDeviationMasters().find(m => m.id === dmKey(grade, round, year)) || null;
+  return _dmCache.find(m => m.id === dmKey(grade, round, year)) || null;
 }
 
 // スコアから偏差値を逆引き
@@ -2231,7 +2238,7 @@ function lookupDeviation(master, subject, score) {
   return null;
 }
 
-// テストフォームの偏差値を自動計算して埋める
+// テストフォームの偏差値を自動計算して埋める（キャッシュ参照なので同期OK）
 function autoCalcDeviation() {
   const grade = document.getElementById('testGradeInput')?.value;
   const round = document.getElementById('testRoundInput')?.value;
@@ -2240,20 +2247,13 @@ function autoCalcDeviation() {
   const master = findDeviationMaster(grade, round, year);
   if (!master) return;
 
-  const scores = {};
   let total4 = 0, total4count = 0;
   for (const s of TEST_SUBJECTS) {
     const sc = parseNum(document.getElementById('score_' + s.key).value);
-    scores[s.key] = sc;
+    const dev = lookupDeviation(master, s.key, sc);
+    if (dev !== null) document.getElementById('deviation_' + s.key).value = dev;
     if (sc !== null) { total4 += sc; total4count++; }
   }
-
-  for (const s of TEST_SUBJECTS) {
-    const dev = lookupDeviation(master, s.key, scores[s.key]);
-    if (dev !== null) document.getElementById('deviation_' + s.key).value = dev;
-  }
-
-  // 4教科合計から総合偏差値
   if (total4count === TEST_SUBJECTS.length) {
     const totalDev = lookupDeviation(master, 'total4', total4);
     if (totalDev !== null) document.getElementById('totalDeviationInput').value = totalDev;
@@ -2305,15 +2305,10 @@ async function extractDeviationFromImage() {
   document.getElementById('dm_extractStatus').textContent = '🔄 AI解析中...（数秒かかります）';
   document.getElementById('dm_extractResult').style.display = 'none';
   document.getElementById('dm_saveBtn').disabled = true;
-
   try {
-    const res = await fetch(DEVIATION_MASTER_SUPABASE_URL, {
+    const res = await fetch(EXTRACT_DEVIATION_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'apikey': SUPABASE_KEY,
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}`, 'apikey': SUPABASE_KEY },
       body: JSON.stringify({ imageBase64: _dmImageBase64, mediaType: _dmMediaType }),
     });
     if (!res.ok) {
@@ -2321,11 +2316,9 @@ async function extractDeviationFromImage() {
       throw new Error(b.error || `HTTP ${res.status}`);
     }
     _dmExtracted = await res.json();
-
-    // プレビュー表示
     const avg = _dmExtracted.averages || {};
-    const preview = `平均点: 算数${avg.sansu??'－'} 国語${avg.kokugo??'－'} 理科${avg.rika??'－'} 社会${avg.shakai??'－'} 4教科${avg.total4??'－'}\n行数: ${(_dmExtracted.rows||[]).length}行`;
-    document.getElementById('dm_resultText').textContent = preview;
+    document.getElementById('dm_resultText').textContent =
+      `平均点: 算数${avg.sansu??'－'} 国語${avg.kokugo??'－'} 理科${avg.rika??'－'} 社会${avg.shakai??'－'} 4教科${avg.total4??'－'}\n行数: ${(_dmExtracted.rows||[]).length}行`;
     document.getElementById('dm_extractResult').style.display = 'block';
     document.getElementById('dm_extractStatus').textContent = '✅ 解析完了！内容を確認して保存してください。';
     document.getElementById('dm_saveBtn').disabled = false;
@@ -2336,35 +2329,39 @@ async function extractDeviationFromImage() {
   }
 }
 
-function saveDmMaster() {
+async function saveDmMaster() {
   if (!_dmExtracted) return;
   const grade = document.getElementById('dm_grade').value;
   const round = document.getElementById('dm_round').value;
   const year  = document.getElementById('dm_year').value.trim();
   if (!year) { alert('年度を入力してください'); return; }
 
-  const masters = loadDeviationMasters();
   const id = dmKey(grade, round, year);
-  const idx = masters.findIndex(m => m.id === id);
-  const entry = { id, grade, round, year, ..._dmExtracted };
-  if (idx >= 0) masters[idx] = entry; else masters.push(entry);
-  saveDeviationMasters(masters);
+  const { error } = await sb.from('study_deviation_masters').upsert({
+    id, grade, round, year,
+    averages: _dmExtracted.averages || null,
+    rows: _dmExtracted.rows || [],
+  });
+  if (error) { alert('保存失敗: ' + error.message); return; }
+
+  await fetchDeviationMasters();
   renderDeviationMasterList();
   closeDmModal();
 }
 
-function deleteDeviationMaster(id) {
+async function deleteDeviationMaster(id) {
   if (!confirm('このマスタを削除しますか？')) return;
-  saveDeviationMasters(loadDeviationMasters().filter(m => m.id !== id));
+  const { error } = await sb.from('study_deviation_masters').delete().eq('id', id);
+  if (error) { alert('削除失敗: ' + error.message); return; }
+  await fetchDeviationMasters();
   renderDeviationMasterList();
 }
 
 function renderDeviationMasterList() {
   const list = document.getElementById('devMasterList');
   if (!list) return;
-  const masters = loadDeviationMasters();
-  if (!masters.length) { list.innerHTML = '<p style="font-size:13px;color:var(--text-secondary);margin:0">まだ登録がありません</p>'; return; }
-  list.innerHTML = masters.map(m => `
+  if (!_dmCache.length) { list.innerHTML = '<p style="font-size:13px;color:var(--text-secondary);margin:0">まだ登録がありません</p>'; return; }
+  list.innerHTML = _dmCache.map(m => `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;font-size:14px">
       <div>
         <span style="font-weight:600">${m.grade} ${m.round} ${m.year}年</span>
@@ -2374,7 +2371,8 @@ function renderDeviationMasterList() {
     </div>`).join('');
 }
 
-renderDeviationMasterList();
+// 起動時にSupabaseからマスタを取得
+fetchDeviationMasters().then(() => renderDeviationMasterList());
 </script>
 </body>
 </html>
