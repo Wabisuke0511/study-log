@@ -885,9 +885,12 @@ function fromTestRow(r) {
            totalDeviation: r.total_deviation ?? null };
 }
 function toSchoolRow(s, n) {
+  const c50 = s.targetDeviationFrom ?? s.targetDeviation ?? 0;
+  const a80 = s.targetDeviationTo   ?? s.targetDeviation ?? 0;
   return { id: s.id, child_name: n, name: s.name,
-           target_deviation_from: s.targetDeviationFrom,
-           target_deviation_to:   s.targetDeviationTo };
+           target_deviation:      c50,
+           target_deviation_from: c50,
+           target_deviation_to:   a80 };
 }
 function fromSchoolRow(r) {
   return { id: Number(r.id), name: r.name,
