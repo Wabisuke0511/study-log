@@ -958,15 +958,10 @@ async function pullFromSupabase() {
         renderTestRecords();
       }
     }
-    // 志望校マスタ
-    if (sc && sc.length) {
-      const local = loadTargetSchools();
-      const ids = new Set(local.map(s => s.id));
-      const toAdd = sc.filter(s => !ids.has(Number(s.id))).map(fromSchoolRow);
-      if (toAdd.length) {
-        localStorage.setItem('targetSchools', JSON.stringify([...local, ...toAdd]));
-        renderSchoolList();
-      }
+    // 志望校マスタ：Supabaseを正とし、ローカルを完全上書き
+    if (sc) {
+      localStorage.setItem('targetSchools', JSON.stringify(sc.map(fromSchoolRow)));
+      renderSchoolList();
     }
   } catch(e) { console.warn('pullFromSupabase:', e.message); }
 }
