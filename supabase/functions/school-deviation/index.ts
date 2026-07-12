@@ -461,12 +461,12 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
   try {
-    const { schoolName } = await req.json();
+    const { schoolName: inputName } = await req.json();
 
-    const code = await findCodeByClaude(schoolName);
+    const code = await findCodeByClaude(inputName);
     if (!code) {
       return new Response(
-        JSON.stringify({ error: `「${schoolName}」は四谷大塚の掲載校リストに見つかりませんでした` }),
+        JSON.stringify({ error: `「${inputName}」は四谷大塚の掲載校リストに見つかりませんでした` }),
         { status: 404, headers: { ...cors, 'Content-Type': 'application/json' } }
       );
     }
