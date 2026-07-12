@@ -1,0 +1,8 @@
+{
+  "name": "学習記録",
+  "short_name": "学習記録",
+  "display": "standalone",
+  "start_url": ".",
+  "background_color": "#f2f2f7",
+  "theme_color": "#007aff"
+}
