@@ -958,10 +958,17 @@ async function pullFromSupabase() {
         renderTestRecords();
       }
     }
-    // 志望校マスタ：Supabaseにデータがあればローカルを完全上書き（なければローカル維持）
-    if (sc && sc.length) {
-      localStorage.setItem('targetSchools', JSON.stringify(sc.map(fromSchoolRow)));
-      renderSchoolList();
+    // 志望校マスタ：Supabaseを正とする
+    if (sc !== null) {
+      const local = loadTargetSchools();
+      if (sc.length > 0) {
+        // Supabaseにデータあり → ローカルを上書き（追加・編集・削除すべて反映）
+        localStorage.setItem('targetSchools', JSON.stringify(sc.map(fromSchoolRow)));
+        renderSchoolList();
+      } else if (local.length > 0) {
+        // Supabaseが空・ローカルにデータあり → 初回デバイス登録としてローカルをアップロード
+        await syncTargetSchools(local);
+      }
     }
   } catch(e) { console.warn('pullFromSupabase:', e.message); }
 }
