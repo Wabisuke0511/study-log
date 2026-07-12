@@ -1687,6 +1687,21 @@ function renderDeviationChart() {
     order: 2,
   });
 
+  // 早稲アカSSランク基準ライン（56・実線）
+  datasets.push({
+    type: 'line',
+    label: '🎯 早稲アカSS (56)',
+    data: groups.map(() => 56),
+    borderColor: '#e67700',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    pointRadius: 0,
+    tension: 0,
+    fill: false,
+    spanGaps: true,
+    order: 0,
+  });
+
   // 志望校の目標偏差値ライン（C50・A80 を別々の線で表示）
   const schools = loadTargetSchools();
   schools.forEach((school, i) => {
@@ -1746,10 +1761,10 @@ function renderDeviationChart() {
     }
   });
 
-  // デフォルト表示：C50のみON、A80・総合はOFF
+  // デフォルト表示：総合・C50・早稲アカSSはON、A80はOFF
   datasets.forEach((ds, i) => {
-    const isC50 = ds.label.includes('C50');
-    chartDeviationInstance.setDatasetVisibility(i, isC50);
+    const on = ds.label === '総合' || ds.label.includes('C50') || ds.label.includes('早稲アカSS');
+    chartDeviationInstance.setDatasetVisibility(i, on);
   });
   chartDeviationInstance.update();
 
@@ -1807,6 +1822,17 @@ function renderSubjectCharts() {
           borderColor: s.color,
           borderWidth: 2,
           borderRadius: 4,
+        }, {
+          type: 'line',
+          label: '早稲アカSS (56)',
+          data: groups.map(() => 56),
+          borderColor: '#e67700',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+          spanGaps: true,
         }]
       },
       options: {
