@@ -920,10 +920,18 @@ async function syncTargetSchools(schools) {
   const n = loadName(); if (!n) return;
   showSyncStatus('☁️ 同期中…');
   try {
-    await sb.from('study_target_schools').delete().eq('child_name', n);
-    if (schools.length) await sb.from('study_target_schools').insert(schools.map(s => toSchoolRow(s, n)));
+    const { error: delErr } = await sb.from('study_target_schools').delete().eq('child_name', n);
+    if (delErr) throw delErr;
+    if (schools.length) {
+      const rows = schools.map(s => toSchoolRow(s, n));
+      const { error: insErr } = await sb.from('study_target_schools').insert(rows);
+      if (insErr) throw insErr;
+    }
     showSyncStatus('☁️ 同期済み');
-  } catch(e) { console.warn('sync study_target_schools:', e.message); showSyncStatus(''); }
+  } catch(e) {
+    console.warn('sync study_target_schools:', e.message, e);
+    showSyncStatus('⚠️ 同期失敗: ' + e.message);
+  }
 }
 
 // ── 起動時：Supabase → localStorage へのマージ ──
