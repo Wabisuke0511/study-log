@@ -2296,6 +2296,8 @@ function autoCalcDeviation() {
     const sc = parseNum(document.getElementById('score_' + s.key).value);
     const dev = lookupDeviation(master, s.key, sc);
     if (dev !== null) document.getElementById('deviation_' + s.key).value = dev;
+    const avg = master.averages?.[s.key];
+    if (avg != null) document.getElementById('average_' + s.key).value = avg;
     if (sc !== null) { total4 += sc; total4count++; }
   }
   // 4教科全部入力済みなら総合偏差値も自動入力
