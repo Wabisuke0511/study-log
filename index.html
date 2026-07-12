@@ -758,14 +758,20 @@
       <div class="kpi-row" id="dashKpi"></div>
     </div>
 
-    <!-- グラフ①：偏差値の推移 -->
+    <!-- グラフ①：総合偏差値と志望校の偏差値 -->
     <div class="card">
-      <div class="card-title">📐 偏差値の推移</div>
-      <select id="deviationRoundSelect" onchange="renderDeviationChart()"
+      <div class="card-title">📐 総合偏差値と志望校の偏差値</div>
+      <select id="deviationRoundSelect" onchange="onRoundChange()"
         style="width:100%;padding:8px 12px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-size:14px;margin-bottom:10px;">
       </select>
       <div id="deviationToggleLegend" style="display:flex;flex-wrap:wrap;gap:4px 8px;margin-bottom:8px;"></div>
       <div id="deviationChartWrap"><div class="chart-wrap"><canvas id="chartDeviation"></canvas></div></div>
+    </div>
+
+    <!-- グラフ②：各科目の偏差値 -->
+    <div class="card">
+      <div class="card-title">📊 各科目の偏差値</div>
+      <div id="subjectChartsWrap"></div>
     </div>
 
     <!-- グラフ③：解き直し進捗 -->
@@ -1582,6 +1588,7 @@ Chart.defaults.color = '#6c6c70';
 function renderDashboard() {
   renderKpi();
   renderDeviationChart();
+  renderSubjectCharts();
   renderReviewProgress();
   renderStudyChart();
 }
@@ -1667,20 +1674,8 @@ function renderDeviationChart() {
     .sort((a, b) => (a.year || '').localeCompare(b.year || ''));
   const labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
 
-  // 4教科の偏差値ライン
-  const datasets = TEST_SUBJECTS.map(s => ({
-    type: 'line',
-    label: s.label,
-    data: groups.map(g => {
-      const sub = g.subjects[s.key];
-      return (sub && sub.deviation !== null) ? sub.deviation : null;
-    }),
-    borderColor: s.color, backgroundColor: s.color+'22',
-    pointBackgroundColor: s.color, pointRadius: 5, pointHoverRadius: 7,
-    tension: 0.3, spanGaps: false, order: 1,
-  }));
-
   // 総合偏差値（棒グラフ）
+  const datasets = [];
   datasets.push({
     type: 'bar',
     label: '総合',
@@ -1751,15 +1746,23 @@ function renderDeviationChart() {
     }
   });
 
+  // デフォルト表示：C50のみON、A80・総合はOFF
+  datasets.forEach((ds, i) => {
+    const isC50 = ds.label.includes('C50');
+    chartDeviationInstance.setDatasetVisibility(i, isC50);
+  });
+  chartDeviationInstance.update();
+
   // トグルチェックボックスを動的生成
   document.getElementById('deviationToggleLegend').innerHTML = datasets.map((ds, i) => {
     const color = (ds.borderColor || '#888').replace('99','');
+    const isC50 = ds.label.includes('C50');
     const isBar = ds.type === 'bar';
     const icon = isBar
       ? `<span style="display:inline-block;width:12px;height:12px;background:${color};border-radius:2px;vertical-align:middle;margin-right:3px;"></span>`
       : `<span style="display:inline-block;width:16px;height:3px;background:${color};vertical-align:middle;margin-right:3px;border-radius:2px;"></span>`;
     return `<label style="display:inline-flex;align-items:center;font-size:12px;cursor:pointer;padding:3px 7px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);">
-      <input type="checkbox" checked onchange="toggleDeviationDataset(${i},this.checked)" style="margin-right:4px;accent-color:${color};">
+      <input type="checkbox" ${isC50?'checked':''} onchange="toggleDeviationDataset(${i},this.checked)" style="margin-right:4px;accent-color:${color};">
       ${icon}${ds.label}
     </label>`;
   }).join('');
@@ -1769,6 +1772,53 @@ function toggleDeviationDataset(index, visible) {
   if (!chartDeviationInstance) return;
   chartDeviationInstance.setDatasetVisibility(index, visible);
   chartDeviationInstance.update();
+}
+
+function onRoundChange() {
+  renderDeviationChart();
+  renderSubjectCharts();
+}
+
+const _subjectChartInstances = {};
+function renderSubjectCharts() {
+  const all = getTestGroups();
+  const wrap = document.getElementById('subjectChartsWrap');
+  if (!all.length) { wrap.innerHTML = `<div class="empty-state" style="padding:16px 0"><p>テスト記録を追加すると表示されます</p></div>`; return; }
+
+  const sel = document.getElementById('deviationRoundSelect');
+  const selectedRound = sel ? sel.value : '';
+  const groups = all
+    .filter(g => `${g.grade ? g.grade+' ' : ''}${g.round}` === selectedRound)
+    .sort((a, b) => (a.year||'').localeCompare(b.year||''));
+  const labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
+
+  wrap.innerHTML = TEST_SUBJECTS.map(s => `<div style="margin-bottom:16px;"><div style="font-size:13px;font-weight:600;margin-bottom:4px;color:${s.color}">${s.emoji} ${s.label}</div><div class="chart-wrap"><canvas id="subjectChart_${s.key}"></canvas></div></div>`).join('');
+
+  TEST_SUBJECTS.forEach(s => {
+    if (_subjectChartInstances[s.key]) { _subjectChartInstances[s.key].destroy(); }
+    _subjectChartInstances[s.key] = new Chart(document.getElementById(`subjectChart_${s.key}`), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: s.label,
+          data: groups.map(g => { const sub = g.subjects[s.key]; return sub && sub.deviation != null ? sub.deviation : null; }),
+          backgroundColor: s.color + '66',
+          borderColor: s.color,
+          borderWidth: 2,
+          borderRadius: 4,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `偏差値: ${ctx.parsed.y}` } } },
+        scales: {
+          y: { min: 45, max: 65, ticks: { stepSize: 5 }, grid: { color: '#f0f0f0' } },
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+  });
 }
 
 // ── グラフ③：解き直し進捗（ドーナツ＋バー）──
