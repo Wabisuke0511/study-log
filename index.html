@@ -1020,14 +1020,29 @@ async function pullFromSupabase() {
       sb.from('study_target_schools').select('*').eq('child_name', n),
     ]);
 
-    // 勉強時間
-    if (sd && sd.length) {
+    // 勉強時間：Supabaseを正として全フィールドを上書きマージ
+    if (sd !== null) {
       const local = loadStudyData();
-      const ids = new Set(local.map(r => r.id));
-      const toAdd = sd.filter(r => !ids.has(Number(r.id))).map(fromStudyRow);
-      if (toAdd.length) {
-        localStorage.setItem('studyRecords', JSON.stringify([...local, ...toAdd]));
-        renderStudyRecords();
+      if (sd.length > 0) {
+        const localMap = new Map(local.map(r => [r.id, r]));
+        let changed = false;
+        for (const r of sd) {
+          const remote = fromStudyRow(r);
+          const existing = localMap.get(remote.id);
+          if (!existing) {
+            localMap.set(remote.id, remote);
+            changed = true;
+          } else if (JSON.stringify(existing) !== JSON.stringify(remote)) {
+            localMap.set(remote.id, remote);
+            changed = true;
+          }
+        }
+        if (changed) {
+          localStorage.setItem('studyRecords', JSON.stringify([...localMap.values()]));
+          renderStudyRecords();
+        }
+      } else if (local.length > 0) {
+        syncStudyRecords(local);
       }
     }
     // テスト記録：Supabaseを正として全フィールド（reviewed/reviewDate含む）を上書きマージ
