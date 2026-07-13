@@ -1030,39 +1030,51 @@ async function pullFromSupabase() {
         renderStudyRecords();
       }
     }
-    // テスト記録
-    if (td && td.length) {
+    // テスト記録：Supabaseを正として全フィールド（reviewed/reviewDate含む）を上書きマージ
+    if (td !== null) {
       const local = loadTestData();
-      const localMap = new Map(local.map(e => [e.id, e]));
-      let changed = false;
-      for (const r of td) {
-        const remote = fromTestRow(r);
-        const existing = localMap.get(remote.id);
-        if (!existing) {
-          localMap.set(remote.id, remote);
-          changed = true;
-        } else if (existing.totalDeviation == null && remote.totalDeviation != null) {
-          existing.totalDeviation = remote.totalDeviation;
-          changed = true;
+      if (td.length > 0) {
+        const localMap = new Map(local.map(e => [e.id, e]));
+        let changed = false;
+        for (const r of td) {
+          const remote = fromTestRow(r);
+          const existing = localMap.get(remote.id);
+          if (!existing) {
+            localMap.set(remote.id, remote);
+            changed = true;
+          } else {
+            // subjects（reviewed/reviewDate含む）・totalDeviationをSupabaseで上書き
+            const updatedSubjects = remote.subjects || existing.subjects;
+            const updatedTotalDev = remote.totalDeviation ?? existing.totalDeviation;
+            if (JSON.stringify(existing.subjects) !== JSON.stringify(updatedSubjects) ||
+                existing.totalDeviation !== updatedTotalDev) {
+              existing.subjects      = updatedSubjects;
+              existing.totalDeviation = updatedTotalDev;
+              changed = true;
+            }
+          }
         }
-      }
-      if (changed) {
-        localStorage.setItem('testEntries', JSON.stringify([...localMap.values()]));
-        renderTestRecords();
+        if (changed) {
+          localStorage.setItem('testEntries', JSON.stringify([...localMap.values()]));
+          renderTestRecords();
+        }
+      } else if (local.length > 0) {
+        // Supabaseが空でローカルにデータあり → アップロード
+        syncTestEntries(local);
       }
     }
     // 志望校マスタ：Supabaseを正とする
     if (sc !== null) {
       const local = loadTargetSchools();
       if (sc.length > 0) {
-        // Supabaseにデータあり → ローカルを上書き（追加・編集・削除すべて反映）
         localStorage.setItem('targetSchools', JSON.stringify(sc.map(fromSchoolRow)));
         renderSchoolList();
       } else if (local.length > 0) {
-        // Supabaseが空・ローカルにデータあり → 初回デバイス登録としてローカルをアップロード
         await syncTargetSchools(local);
       }
     }
+    // 偏差値マスタ：Supabaseから再取得してキャッシュ更新
+    await fetchDeviationMasters();
   } catch(e) { console.warn('pullFromSupabase:', e.message); }
 }
 
