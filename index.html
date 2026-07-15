@@ -2442,6 +2442,28 @@ async function extractDeviationFromImage() {
   }
 }
 
+// 各列が偏差値降順で単調減少しているか検証し、逆転している値をnullにする
+function sanitizeDeviationRows(rows) {
+  const cols = ['sansu','kokugo','rika','shakai','total2','total3','total4'];
+  const cleaned = rows.map(r => ({ ...r }));
+  for (const col of cols) {
+    let prevMin = Infinity;
+    for (const row of cleaned) {
+      const range = row[col];
+      if (!range) continue;
+      const [mn, mx] = range;
+      if (mn === null || mx === null) { row[col] = null; continue; }
+      // 偏差値降順なので、スコアの最大値が前の行より大きければ逆転 → null化
+      if (mx >= prevMin) {
+        row[col] = null;
+      } else {
+        prevMin = mn;
+      }
+    }
+  }
+  return cleaned;
+}
+
 async function saveDmMaster() {
   if (!_dmExtracted) return;
   const grade = document.getElementById('dm_grade').value;
@@ -2449,11 +2471,12 @@ async function saveDmMaster() {
   const year  = document.getElementById('dm_year').value.trim();
   if (!year) { alert('年度を入力してください'); return; }
 
+  const sanitizedRows = sanitizeDeviationRows(_dmExtracted.rows || []);
   const id = dmKey(grade, round, year);
   const { error } = await sb.from('study_deviation_masters').upsert({
     id, grade, round, year,
     averages: _dmExtracted.averages || null,
-    rows: _dmExtracted.rows || [],
+    rows: sanitizedRows,
   });
   if (error) { alert('保存失敗: ' + error.message); return; }
 
