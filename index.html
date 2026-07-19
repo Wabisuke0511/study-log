@@ -1991,30 +1991,45 @@ function renderDeviationChart() {
     return;
   }
 
-  // ドロップダウン：ユニークな「学年＋回＋種別」リスト
+  // ドロップダウン：過去問は「学年+回」、本番は「学年+年度」でグループ
   const TYPE_ICON = { '過去問': '📚', '本番': '🏆' };
   const roundKeys = [...new Set(all.map(g => {
     const type = g.type || '過去問';
-    return `${g.grade ? g.grade+' ' : ''}${g.round}|${type}`;
+    const keyPart = type === '本番'
+      ? `${g.grade ? g.grade+' ' : ''}${g.year}年`
+      : `${g.grade ? g.grade+' ' : ''}${g.round}`;
+    return `${keyPart}|${type}`;
   }))];
   const sel = document.getElementById('deviationRoundSelect');
   const prevVal = sel.value;
   sel.innerHTML = roundKeys.map(k => {
-    const [roundPart, typePart] = k.split('|');
+    const [keyPart, typePart] = k.split('|');
     const icon = TYPE_ICON[typePart] || '📚';
-    return `<option value="${k}"${k===prevVal?'selected':''}>${icon} ${roundPart}（${typePart}）</option>`;
+    return `<option value="${k}"${k===prevVal?'selected':''}>${icon} ${keyPart}（${typePart}）</option>`;
   }).join('');
   const selectedRound = sel.value || roundKeys[0];
 
-  // 選択された回・種別でフィルタし、年度順に並べる
-  const [selectedRoundPart, selectedType] = selectedRound.split('|');
-  const groups = all
-    .filter(g => {
-      const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
-      return gKey === selectedRoundPart && (g.type || '過去問') === (selectedType || '過去問');
-    })
-    .sort((a, b) => (a.year || '').localeCompare(b.year || ''));
-  const labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
+  const [selectedKeyPart, selectedType] = selectedRound.split('|');
+  let groups, labels;
+  if (selectedType === '本番') {
+    // 本番：同じ学年+年度の全回をX軸（第1回→第2回→…）に並べる
+    groups = all
+      .filter(g => {
+        const gKey = `${g.grade ? g.grade+' ' : ''}${g.year}年`;
+        return gKey === selectedKeyPart && (g.type || '過去問') === '本番';
+      })
+      .sort((a, b) => (parseInt((a.round||'').replace(/[^0-9]/g,''))||0) - (parseInt((b.round||'').replace(/[^0-9]/g,''))||0));
+    labels = groups.map(g => g.round || g.date.substring(5,7)+'月');
+  } else {
+    // 過去問：同じ学年+回の全年度をX軸（年度順）に並べる
+    groups = all
+      .filter(g => {
+        const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
+        return gKey === selectedKeyPart && (g.type || '過去問') === '過去問';
+      })
+      .sort((a, b) => (a.year || '').localeCompare(b.year || ''));
+    labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
+  }
 
   // 総合偏差値（棒グラフ）
   const datasets = [];
@@ -2140,14 +2155,25 @@ function renderSubjectCharts() {
 
   const sel = document.getElementById('deviationRoundSelect');
   const selectedRound = sel ? sel.value : '';
-  const [selectedRoundPart2, selectedType2] = selectedRound.split('|');
-  const groups = all
-    .filter(g => {
-      const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
-      return gKey === selectedRoundPart2 && (g.type || '過去問') === (selectedType2 || '過去問');
-    })
-    .sort((a, b) => (a.year||'').localeCompare(b.year||''));
-  const labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
+  const [selectedKeyPart2, selectedType2] = selectedRound.split('|');
+  let groups, labels;
+  if (selectedType2 === '本番') {
+    groups = all
+      .filter(g => {
+        const gKey = `${g.grade ? g.grade+' ' : ''}${g.year}年`;
+        return gKey === selectedKeyPart2 && (g.type || '過去問') === '本番';
+      })
+      .sort((a, b) => (parseInt((a.round||'').replace(/[^0-9]/g,''))||0) - (parseInt((b.round||'').replace(/[^0-9]/g,''))||0));
+    labels = groups.map(g => g.round || g.date.substring(5,7)+'月');
+  } else {
+    groups = all
+      .filter(g => {
+        const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
+        return gKey === selectedKeyPart2 && (g.type || '過去問') === '過去問';
+      })
+      .sort((a, b) => (a.year||'').localeCompare(b.year||''));
+    labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
+  }
 
   wrap.innerHTML = TEST_SUBJECTS.map(s => `<div style="margin-bottom:16px;"><div style="font-size:13px;font-weight:600;margin-bottom:4px;color:${s.color}">${s.emoji} ${s.label}</div><div class="chart-wrap"><canvas id="subjectChart_${s.key}"></canvas></div></div>`).join('');
 
