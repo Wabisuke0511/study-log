@@ -1,24 +1,31 @@
-// キャッシュ名：index.html を更新するたびにここの番号を上げる
-const CACHE = 'study-tracker-v1';
+// キャッシュ名：デプロイのたびに更新する（app versionと合わせる）
+const CACHE = 'study-tracker-v15';
 
-// インストール直後に即アクティブ化（待機しない）
+// インストール直後に即アクティブ化
 self.addEventListener('install', () => self.skipWaiting());
 
-// 古いキャッシュをまとめて削除してから、全クライアントを掌握する
+// 古いキャッシュを削除してから全クライアントを掌握
 self.addEventListener('activate', e =>
   e.waitUntil(
     caches.keys()
-      .then(keys =>
-        Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-      )
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   )
 );
 
-// ネットワーク優先（同一オリジンのみ）：
-//   外部API（Supabase等）は SW を素通りさせる
 self.addEventListener('fetch', e => {
   if (!e.request.url.startsWith(self.location.origin)) return;
+
+  // ナビゲーション（index.html）は常にネットワーク優先・キャッシュしない
+  // → デプロイ後すぐに最新版が反映される
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // その他のリソース（manifest.json等）はネットワーク優先でキャッシュ
   e.respondWith(
     fetch(e.request)
       .then(res => {
