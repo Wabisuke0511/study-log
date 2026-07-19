@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>学習記録</title>
+  <title>早稲アカ学習記録</title>
   <link rel="manifest" href="manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="apple-mobile-web-app-title" content="学習記録" />
+  <meta name="apple-mobile-web-app-title" content="早稲アカ学習記録" />
   <meta name="theme-color" content="#007aff" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -421,6 +421,33 @@
     .kpi-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: 4px; }
     .kpi-value { font-size: 24px; font-weight: 800; color: var(--text); }
     .kpi-unit  { font-size: 12px; color: var(--text-secondary); }
+    /* バージョンバッジ */
+    .app-title-wrap { display: flex; align-items: baseline; gap: 8px; }
+    .version-badge {
+      font-size: 11px; font-weight: 700; padding: 2px 8px;
+      border-radius: 6px; background: var(--input-bg); color: var(--text-secondary);
+      border: 1px solid var(--border); cursor: pointer; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .version-badge:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+    /* 変更履歴モーダル */
+    .cl-list { max-height: 60vh; overflow-y: auto; padding-right: 4px; }
+    .cl-block { margin-bottom: 20px; }
+    .cl-block:last-child { margin-bottom: 0; }
+    .cl-version-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .cl-vnum { font-size: 16px; font-weight: 800; color: var(--text); }
+    .cl-date { font-size: 12px; color: var(--text-secondary); }
+    .cl-tag { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px; }
+    .cl-tag-feat { background: #e8edff; color: #3b5bdb; }
+    .cl-tag-fix  { background: #ecfdf3; color: #2f9e44; }
+    .cl-tag-ai   { background: #f3eeff; color: #6741d9; }
+    .cl-items { list-style: none; padding: 0; margin: 0; }
+    .cl-items li {
+      font-size: 13px; color: var(--text-secondary); padding: 5px 0;
+      border-bottom: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-start;
+    }
+    .cl-items li:last-child { border-bottom: none; }
+    .cl-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); flex-shrink: 0; margin-top: 6px; }
     /* テスト種別セレクタ */
     .test-type-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
     .test-type-btn {
@@ -457,6 +484,17 @@
 </head>
 <body>
 
+<!-- 変更履歴モーダル -->
+<div class="modal-overlay hidden" id="changelogModal">
+  <div class="modal" style="max-width:420px;width:100%;text-align:left;padding:28px 24px 24px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-size:18px;font-weight:800">📋 変更履歴</div>
+      <button onclick="closeChangelogModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary);line-height:1">✕</button>
+    </div>
+    <div class="cl-list" id="changelogList"></div>
+  </div>
+</div>
+
 <!-- 名前登録モーダル -->
 <div class="modal-overlay hidden" id="nameModal">
   <div class="modal">
@@ -471,7 +509,10 @@
 <!-- ヘッダー -->
 <header>
   <div class="header-top">
-    <div class="app-title">📚 学習記録</div>
+    <div class="app-title-wrap">
+      <div class="app-title">📚 早稲アカ学習記録</div>
+      <button class="version-badge" onclick="openChangelogModal()">v1.4</button>
+    </div>
     <span id="syncStatus" style="font-size:12px;color:var(--text-secondary);opacity:0;transition:opacity 0.4s;flex:1;text-align:center;pointer-events:none;"></span>
     <button class="name-display" onclick="openNameModal()">
       <span id="headerName" class="name-display-name"></span>
@@ -963,6 +1004,83 @@
 const SUPABASE_URL = 'https://jqtmibcnllvbpwvzxlea.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_9ATK4N1-amyEWwJiCVgOJA_wpQ5Anka';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// =====================================================
+//  バージョン・変更履歴
+// =====================================================
+const APP_VERSION = 'v1.4';
+const CHANGELOG = [
+  {
+    version: 'v1.4', date: '2026-07-19', tags: ['feat'],
+    changes: [
+      '過去問と本番（実際のテスト）を区別して入力できるように',
+      'テスト一覧を「過去問」「本番」のトグルセクションで表示',
+      '各セクション内を第X回→年度順でソート',
+      'アプリ名を「早稲アカ学習記録」に変更・バージョン表示追加',
+    ]
+  },
+  {
+    version: 'v1.3', date: '2026-07', tags: ['feat', 'fix'],
+    changes: [
+      '第9回を学年・偏差値マスタの選択肢に追加',
+      '一括入力・個別入力どちらでも平均点を自動入力',
+      '個別入力でも偏差値を自動計算',
+      'グラフY軸の上限を70に固定',
+    ]
+  },
+  {
+    version: 'v1.2', date: '2026-07', tags: ['feat', 'fix', 'ai'],
+    changes: [
+      '偏差値マスタ機能：換算表の画像をAIで解析してSupabaseに登録',
+      'テスト入力時に点数→偏差値・平均点を自動入力',
+      '解き直しチェック・勉強時間修正がデバイス間で同期されない不具合を修正',
+      '偏差値マスタの単調性バリデーション（誤抽出防止）',
+    ]
+  },
+  {
+    version: 'v1.1', date: '2026-07', tags: ['feat'],
+    changes: [
+      '志望校マスタ：C50（50%）・A80（80%）偏差値ラインを管理',
+      '四谷大塚ドットコムからAIで志望校偏差値を自動取得',
+      '早稲アカSSランク（偏差値56）の参照ラインをグラフに追加',
+      '棒グラフのPC・iPhone表示不具合を修正',
+    ]
+  },
+  {
+    version: 'v1.0', date: '2026-06', tags: ['feat'],
+    changes: [
+      '勉強時間の記録（教科・分数・内容）',
+      '組分けテストの点数・偏差値・解き直し記録',
+      '偏差値推移・解き直し進捗・勉強時間グラフ',
+      'Supabaseによるマルチデバイス同期',
+      'PWA対応（iOSホーム画面追加）',
+    ]
+  },
+];
+
+const TAG_LABELS = { feat: 'FEAT', fix: 'FIX', ai: 'AI' };
+const TAG_CLASS  = { feat: 'cl-tag-feat', fix: 'cl-tag-fix', ai: 'cl-tag-ai' };
+
+function openChangelogModal() {
+  const list = document.getElementById('changelogList');
+  list.innerHTML = CHANGELOG.map(v => `
+    <div class="cl-block">
+      <div class="cl-version-row">
+        <span class="cl-vnum">${v.version}</span>
+        <span class="cl-date">${v.date}</span>
+        ${v.tags.map(t => `<span class="cl-tag ${TAG_CLASS[t]}">${TAG_LABELS[t]}</span>`).join('')}
+      </div>
+      <ul class="cl-items">
+        ${v.changes.map(c => `<li><span class="cl-dot"></span><span>${c}</span></li>`).join('')}
+      </ul>
+    </div>
+  `).join('<hr style="border:none;border-top:1px solid var(--border);margin:0 0 20px">');
+  document.getElementById('changelogModal').classList.remove('hidden');
+}
+
+function closeChangelogModal() {
+  document.getElementById('changelogModal').classList.add('hidden');
+}
 
 // 画面上部に同期状態を一瞬表示するヘルパー
 let _syncTimer = null;
