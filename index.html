@@ -1991,16 +1991,28 @@ function renderDeviationChart() {
     return;
   }
 
-  // ドロップダウン：ユニークな回名リスト（学年＋回）
-  const roundKeys = [...new Set(all.map(g => `${g.grade ? g.grade+' ' : ''}${g.round}`))];
+  // ドロップダウン：ユニークな「学年＋回＋種別」リスト
+  const TYPE_ICON = { '過去問': '📚', '本番': '🏆' };
+  const roundKeys = [...new Set(all.map(g => {
+    const type = g.type || '過去問';
+    return `${g.grade ? g.grade+' ' : ''}${g.round}|${type}`;
+  }))];
   const sel = document.getElementById('deviationRoundSelect');
   const prevVal = sel.value;
-  sel.innerHTML = roundKeys.map(k => `<option value="${k}"${k===prevVal?'selected':''}>${k}</option>`).join('');
+  sel.innerHTML = roundKeys.map(k => {
+    const [roundPart, typePart] = k.split('|');
+    const icon = TYPE_ICON[typePart] || '📚';
+    return `<option value="${k}"${k===prevVal?'selected':''}>${icon} ${roundPart}（${typePart}）</option>`;
+  }).join('');
   const selectedRound = sel.value || roundKeys[0];
 
-  // 選択された回でフィルタし、年度順に並べる
+  // 選択された回・種別でフィルタし、年度順に並べる
+  const [selectedRoundPart, selectedType] = selectedRound.split('|');
   const groups = all
-    .filter(g => `${g.grade ? g.grade+' ' : ''}${g.round}` === selectedRound)
+    .filter(g => {
+      const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
+      return gKey === selectedRoundPart && (g.type || '過去問') === (selectedType || '過去問');
+    })
     .sort((a, b) => (a.year || '').localeCompare(b.year || ''));
   const labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
 
@@ -2128,8 +2140,12 @@ function renderSubjectCharts() {
 
   const sel = document.getElementById('deviationRoundSelect');
   const selectedRound = sel ? sel.value : '';
+  const [selectedRoundPart2, selectedType2] = selectedRound.split('|');
   const groups = all
-    .filter(g => `${g.grade ? g.grade+' ' : ''}${g.round}` === selectedRound)
+    .filter(g => {
+      const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
+      return gKey === selectedRoundPart2 && (g.type || '過去問') === (selectedType2 || '過去問');
+    })
     .sort((a, b) => (a.year||'').localeCompare(b.year||''));
   const labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
 
