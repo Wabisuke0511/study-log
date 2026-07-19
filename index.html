@@ -421,6 +421,38 @@
     .kpi-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; margin-bottom: 4px; }
     .kpi-value { font-size: 24px; font-weight: 800; color: var(--text); }
     .kpi-unit  { font-size: 12px; color: var(--text-secondary); }
+    /* テスト種別セレクタ */
+    .test-type-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+    .test-type-btn {
+      flex: 1; padding: 9px 8px; border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border); background: var(--input-bg);
+      font-size: 14px; font-weight: 600; color: var(--text-secondary);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .test-type-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    /* トグルセクション */
+    .toggle-section { margin-bottom: 10px; }
+    .toggle-header {
+      width: 100%; display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; background: var(--card); border-radius: var(--radius);
+      border: 1px solid var(--border); cursor: pointer; font-size: 15px; font-weight: 700;
+      color: var(--text); text-align: left;
+    }
+    .toggle-header:hover { background: var(--input-bg); }
+    .toggle-header-left { display: flex; align-items: center; gap: 8px; }
+    .toggle-count {
+      font-size: 12px; font-weight: 600; padding: 2px 8px;
+      border-radius: 10px; background: var(--input-bg); color: var(--text-secondary);
+    }
+    .toggle-chevron { color: var(--text-secondary); transition: transform 0.2s; font-size: 12px; }
+    .toggle-chevron.open { transform: rotate(180deg); }
+    .toggle-body { padding-top: 8px; }
+    .toggle-body.hidden { display: none; }
+    /* 本番バッジ */
+    .honban-badge {
+      font-size: 11px; font-weight: 700; padding: 2px 7px;
+      border-radius: 6px; background: #fff3e0; color: #e67700;
+    }
   </style>
 </head>
 <body>
@@ -522,12 +554,18 @@
   <!-- ===== 組分けテストタブ（新デザイン） ===== -->
   <div class="tab-panel" id="panel-test">
     <div class="card" id="testFormCard">
-      <div class="card-title">早稲アカ組分けテスト 過去問記録</div>
+      <div class="card-title">早稲アカ組分けテスト 記録</div>
 
       <!-- 編集中バナー（編集ボタンを押したときだけ表示） -->
       <div class="edit-mode-banner" id="editModeBanner" style="display:none">
         ✏️ 編集中です
         <button class="cancel-edit-btn" onclick="cancelEditTest()">キャンセル</button>
+      </div>
+
+      <!-- テスト種別 -->
+      <div class="test-type-tabs">
+        <button class="test-type-btn active" data-type="過去問" onclick="selectTestType(this)">📚 過去問</button>
+        <button class="test-type-btn" data-type="本番" onclick="selectTestType(this)">🏆 本番（実際のテスト）</button>
       </div>
 
       <!-- テスト共通情報 -->
@@ -952,12 +990,14 @@ function fromStudyRow(r) {
 function toTestRow(e, n) {
   return { id: e.id, child_name: n, grade: e.grade || null,
            round: e.round || null, year: e.year || null, date: e.date,
-           subjects: e.subjects, total_deviation: e.totalDeviation ?? null };
+           subjects: e.subjects, total_deviation: e.totalDeviation ?? null,
+           type: e.type || '過去問' };
 }
 function fromTestRow(r) {
   return { id: Number(r.id), grade: r.grade || '', round: r.round || '',
            year: r.year || '', date: r.date, subjects: r.subjects,
-           totalDeviation: r.total_deviation ?? null };
+           totalDeviation: r.total_deviation ?? null,
+           type: r.type || '過去問' };
 }
 function toSchoolRow(s, n) {
   const c50 = s.targetDeviationFrom ?? s.targetDeviation ?? 0;
@@ -1435,6 +1475,23 @@ function getSubjectInputs(key) {
 let editingTestId   = null;  // 編集中のレコードID
 let inputMode       = 'bulk';
 let singleSubjKey   = 'kokugo';
+let testType        = '過去問'; // '過去問' | '本番'
+let _toggleKakoMon  = true;
+let _toggleHonban   = true;
+
+// 過去問 / 本番 切り替え
+function selectTestType(btn) {
+  document.querySelectorAll('.test-type-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  testType = btn.dataset.type;
+}
+
+// テスト一覧のトグル
+function toggleSection(key) {
+  if (key === 'kakoMon') _toggleKakoMon = !_toggleKakoMon;
+  else                   _toggleHonban  = !_toggleHonban;
+  renderTestRecords();
+}
 
 // 一括 / 個別 タブ切り替え
 function setInputMode(mode) {
@@ -1506,7 +1563,7 @@ function addOrUpdateTestEntry() {
     if (!hasAnyData) { alert('少なくとも1教科の点数・偏差値・平均点のどれかを入力してください'); return; }
 
     const totalDeviation = parseNum(document.getElementById('totalDeviationInput').value);
-    const entry = { id: editingTestId || Date.now(), grade, round, year, date, subjects, totalDeviation };
+    const entry = { id: editingTestId || Date.now(), grade, round, year, date, subjects, totalDeviation, type: testType };
 
     if (editingTestId) {
       const idx = entries.findIndex(e => e.id === editingTestId);
@@ -1532,8 +1589,8 @@ function addOrUpdateTestEntry() {
     }
     const newTotalDev = parseNum(document.getElementById('s_totalDeviation').value);
 
-    // 同じ学年・回・年度のレコードを探す
-    const existIdx = entries.findIndex(e => e.grade === grade && e.round === round && e.year === year);
+    // 同じ学年・回・年度・種別のレコードを探す
+    const existIdx = entries.findIndex(e => e.grade === grade && e.round === round && e.year === year && (e.type || '過去問') === testType);
     if (existIdx >= 0) {
       // 既存レコードのこの教科だけ上書き
       entries[existIdx].subjects[singleSubjKey] = subData;
@@ -1546,7 +1603,7 @@ function addOrUpdateTestEntry() {
         subjects[s.key] = { score: null, deviation: null, average: null, reviewed: false, reviewDate: null };
       }
       subjects[singleSubjKey] = subData;
-      entries.push({ id: Date.now(), grade, round, year, date, subjects, totalDeviation: newTotalDev });
+      entries.push({ id: Date.now(), grade, round, year, date, subjects, totalDeviation: newTotalDev, type: testType });
     }
     clearSingleForm();
   }
@@ -1570,6 +1627,10 @@ function clearTestForm() {
     document.getElementById('reviewDate_' + s.key).style.display = 'none';
   }
   clearSingleForm();
+  // 種別を過去問にリセット
+  testType = '過去問';
+  document.querySelectorAll('.test-type-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.type === '過去問'));
 }
 
 // 削除
@@ -1600,6 +1661,10 @@ function editTestEntry(id) {
     document.getElementById('reviewDate_' + s.key).style.display = sub.reviewed ? 'inline-block' : 'none';
   }
   document.getElementById('totalDeviationInput').value = entry.totalDeviation ?? '';
+  // 種別を復元
+  testType = entry.type || '過去問';
+  document.querySelectorAll('.test-type-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.type === testType));
   calcTotalScore();
   document.getElementById('editModeBanner').style.display  = 'flex';
   document.getElementById('testSubmitBtn').textContent     = '✏️ 更新する';
@@ -1621,25 +1686,33 @@ function getTestGroups() {
 }
 
 function renderTestRecords() {
-  // 一覧は新しい順に並べる
-  const entries = loadTestData().slice().sort((a, b) => b.date.localeCompare(a.date));
+  const all = loadTestData();
   const container = document.getElementById('testRecordList');
-  document.getElementById('testTotalBadge').textContent = entries.length > 0 ? `${entries.length}件` : '';
+  document.getElementById('testTotalBadge').textContent = all.length > 0 ? `${all.length}件` : '';
 
-  if (!entries.length) {
+  if (!all.length) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-emoji">🏆</div><p>まだテスト記録がありません。<br>上のフォームから登録してみよう！</p></div>`;
     return;
   }
 
-  container.innerHTML = entries.map(e => {
-    // 合計点を計算
+  // 第X回 → 数値、年度でソート
+  function roundNum(r) { return parseInt((r || '').replace(/[^0-9]/g, '')) || 0; }
+  function sortByRoundYear(arr) {
+    return arr.slice().sort((a, b) => {
+      const rd = roundNum(a.round) - roundNum(b.round);
+      return rd !== 0 ? rd : (a.year || '').localeCompare(b.year || '');
+    });
+  }
+
+  const kakoMon = sortByRoundYear(all.filter(e => (e.type || '過去問') === '過去問'));
+  const honban  = sortByRoundYear(all.filter(e => e.type === '本番'));
+
+  function entryHtml(e) {
     let totalScore = 0, scoreCount = 0;
     for (const s of TEST_SUBJECTS) {
       const sub = e.subjects[s.key];
       if (sub && sub.score !== null) { totalScore += sub.score; scoreCount++; }
     }
-
-    // 教科ごとの行を作る
     const subjectRows = TEST_SUBJECTS.map(s => {
       const sub = e.subjects[s.key] || {};
       const hasData = sub.score !== null || sub.deviation !== null || sub.average !== null;
@@ -1653,13 +1726,13 @@ function renderTestRecords() {
         : `<span class="rev-none">未</span>`;
       return `<tr>
         <td class="tc-sub">${s.emoji} ${s.label}</td>
-        <td class="tc-score">${sub.score      !== null ? sub.score+'点'  : '<span class="tc-empty">－</span>'}</td>
-        <td class="tc-dev"  >${sub.deviation  !== null ? sub.deviation   : '<span class="tc-empty">－</span>'}</td>
-        <td class="tc-avg"  >${sub.average    !== null ? sub.average+'点': '<span class="tc-empty">－</span>'}</td>
+        <td class="tc-score">${sub.score     !== null ? sub.score+'点'   : '<span class="tc-empty">－</span>'}</td>
+        <td class="tc-dev"  >${sub.deviation !== null ? sub.deviation    : '<span class="tc-empty">－</span>'}</td>
+        <td class="tc-avg"  >${sub.average   !== null ? sub.average+'点' : '<span class="tc-empty">－</span>'}</td>
         <td>${revCell}</td>
       </tr>`;
     }).join('');
-
+    const typeBadge = e.type === '本番' ? `<span class="honban-badge">🏆 本番</span>` : '';
     return `<div class="test-card">
       <div class="test-card-header">
         <div>
@@ -1667,6 +1740,7 @@ function renderTestRecords() {
             ${e.grade ? `<span class="test-card-grade">${e.grade}</span>` : ''}
             <span class="test-card-round">${e.round}</span>
             <span class="test-card-year">${e.year}年</span>
+            ${typeBadge}
           </div>
           <div class="test-card-date">${formatDate(e.date)}</div>
         </div>
@@ -1676,11 +1750,7 @@ function renderTestRecords() {
         </div>
       </div>
       <table class="tc-table">
-        <thead>
-          <tr>
-            <th>教科</th><th>点数</th><th>偏差値</th><th>平均点</th><th>解き直し</th>
-          </tr>
-        </thead>
+        <thead><tr><th>教科</th><th>点数</th><th>偏差値</th><th>平均点</th><th>解き直し</th></tr></thead>
         <tbody>
           ${subjectRows}
           <tr class="tc-total">
@@ -1692,7 +1762,28 @@ function renderTestRecords() {
         </tbody>
       </table>
     </div>`;
-  }).join('');
+  }
+
+  function sectionHtml(key, label, entries, isOpen) {
+    const chevron = `<span class="toggle-chevron${isOpen ? ' open' : ''}">▼</span>`;
+    const body = entries.length
+      ? `<div class="record-list-gap">${entries.map(entryHtml).join('')}</div>`
+      : `<div class="empty-state" style="padding:16px 0"><p>記録がありません</p></div>`;
+    return `<div class="toggle-section">
+      <button class="toggle-header" onclick="toggleSection('${key}')">
+        <div class="toggle-header-left">
+          <span>${label}</span>
+          <span class="toggle-count">${entries.length}件</span>
+        </div>
+        ${chevron}
+      </button>
+      <div class="toggle-body${isOpen ? '' : ' hidden'}">${body}</div>
+    </div>`;
+  }
+
+  container.innerHTML =
+    sectionHtml('kakoMon', '📚 過去問', kakoMon, _toggleKakoMon) +
+    sectionHtml('honban',  '🏆 本番（実際のテスト）', honban, _toggleHonban);
 }
 
 // =====================================================
