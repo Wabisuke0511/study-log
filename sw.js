@@ -1,5 +1,5 @@
 // キャッシュ名：デプロイのたびに更新する（app versionと合わせる）
-const CACHE = 'study-tracker-v15';
+const CACHE = 'study-tracker-v16';
 
 // インストール直後に即アクティブ化
 self.addEventListener('install', () => self.skipWaiting());
