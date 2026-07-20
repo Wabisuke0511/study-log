@@ -931,6 +931,20 @@
       <button class="btn btn-primary" onclick="openDmModal()" style="width:100%">＋ マスタを追加</button>
       <div id="devMasterList" style="margin-top:12px"></div>
     </div>
+
+    <!-- バックアップカード -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-title">💾 データバックアップ</div>
+      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px;line-height:1.6">全データをJSONファイルとして端末に保存します。月1回程度のバックアップを推奨します。</p>
+      <div id="backupStatus" style="font-size:13px;margin-bottom:12px;min-height:18px"></div>
+      <button class="btn btn-primary" id="backupBtn" onclick="exportBackup()" style="width:100%;margin-bottom:8px">💾 今すぐバックアップ</button>
+      <label style="display:block;width:100%">
+        <div class="btn" id="restoreBtn" style="width:100%;background:var(--bg);border:1.5px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px">
+          📂 バックアップから復元
+        </div>
+        <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="onRestoreFileSelected(this)" />
+      </label>
+    </div>
   </div><!-- /panel-settings end of school section -->
 
   <!-- ===== 偏差値マスタ（設定タブ内） ===== -->
@@ -2760,6 +2774,134 @@ function renderDeviationMasterList() {
 
 // 起動時にSupabaseからマスタを取得
 fetchDeviationMasters().then(() => renderDeviationMasterList());
+
+// =====================================================
+//  バックアップ・リストア
+// =====================================================
+function renderBackupStatus() {
+  const el = document.getElementById('backupStatus');
+  if (!el) return;
+  const last = localStorage.getItem('lastBackupDate');
+  if (!last) {
+    el.innerHTML = '<span style="color:var(--danger)">⚠️ まだバックアップが取られていません</span>';
+    return;
+  }
+  const days = Math.floor((Date.now() - new Date(last).getTime()) / 86400000);
+  const color = days > 30 ? 'var(--danger)' : days > 7 ? 'var(--orange, #e67700)' : 'var(--text-secondary)';
+  const warn  = days > 30 ? ' — バックアップを推奨します' : '';
+  el.innerHTML = `<span style="color:${color}">最終バックアップ：${last}（${days}日前）${warn}</span>`;
+}
+
+async function exportBackup() {
+  const btn = document.getElementById('backupBtn');
+  btn.textContent = '⏳ 取得中…';
+  btn.disabled = true;
+  try {
+    const n = loadName();
+    const [{ data: sd }, { data: td }, { data: sc }, { data: dm }] = await Promise.all([
+      sb.from('study_records').select('*').eq('child_name', n),
+      sb.from('study_test_entries').select('*').eq('child_name', n),
+      sb.from('study_target_schools').select('*').eq('child_name', n),
+      sb.from('study_deviation_masters').select('*'),
+    ]);
+    const backup = {
+      version: APP_VERSION,
+      exportedAt: new Date().toISOString(),
+      childName: n,
+      studyRecords:     sd || [],
+      testEntries:      td || [],
+      targetSchools:    sc || [],
+      deviationMasters: dm || [],
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `study-backup-${n}-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    const today = new Date().toISOString().slice(0, 10);
+    localStorage.setItem('lastBackupDate', today);
+    renderBackupStatus();
+    showSyncStatus('✅ バックアップ完了');
+  } catch(e) {
+    alert('バックアップに失敗しました: ' + e.message);
+  } finally {
+    btn.textContent = '💾 今すぐバックアップ';
+    btn.disabled = false;
+  }
+}
+
+function onRestoreFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.childName || !data.exportedAt) throw new Error('不正なファイル形式です');
+      const summary = [
+        `子ども名：${data.childName}`,
+        `バックアップ日：${data.exportedAt.slice(0,10)}`,
+        `勉強記録：${(data.studyRecords||[]).length}件`,
+        `テスト記録：${(data.testEntries||[]).length}件`,
+        `志望校：${(data.targetSchools||[]).length}校`,
+        `偏差値マスタ：${(data.deviationMasters||[]).length}件`,
+      ].join('\n');
+      if (!confirm(`以下のデータを復元しますか？\n\n${summary}\n\n※ 現在のSupabaseデータは上書きされます。`)) {
+        input.value = '';
+        return;
+      }
+      restoreFromBackup(data);
+    } catch(err) {
+      alert('ファイルの読み込みに失敗しました: ' + err.message);
+      input.value = '';
+    }
+  };
+  reader.readAsText(file);
+}
+
+async function restoreFromBackup(data) {
+  const restoreEl = document.getElementById('restoreBtn');
+  restoreEl.textContent = '⏳ 復元中…';
+  try {
+    const n = data.childName;
+    if (data.studyRecords?.length) {
+      await sb.from('study_records').delete().eq('child_name', n);
+      await sb.from('study_records').insert(data.studyRecords);
+    }
+    if (data.testEntries?.length) {
+      await sb.from('study_test_entries').delete().eq('child_name', n);
+      await sb.from('study_test_entries').insert(data.testEntries);
+    }
+    if (data.targetSchools?.length) {
+      await sb.from('study_target_schools').delete().eq('child_name', n);
+      await sb.from('study_target_schools').insert(data.targetSchools);
+    }
+    if (data.deviationMasters?.length) {
+      await sb.from('study_deviation_masters').upsert(data.deviationMasters);
+    }
+    await pullFromSupabase();
+    alert('✅ 復元が完了しました！');
+  } catch(e) {
+    alert('復元に失敗しました: ' + e.message);
+  } finally {
+    restoreEl.textContent = '📂 バックアップから復元';
+    document.getElementById('restoreInput').value = '';
+  }
+}
+
+// 設定タブを開くたびにバックアップ状態を更新
+const _origSwitchTab = switchTab;
+// eslint-disable-next-line no-global-assign
+switchTab = function(tab) {
+  _origSwitchTab(tab);
+  if (tab === 'settings') renderBackupStatus();
+};
+
+// 起動時にも表示
+renderBackupStatus();
 </script>
 </body>
 </html>
