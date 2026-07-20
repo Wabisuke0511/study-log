@@ -1026,8 +1026,16 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // =====================================================
 //  バージョン・変更履歴
 // =====================================================
-const APP_VERSION = 'v1.4';
+const APP_VERSION = 'v1.5';
 const CHANGELOG = [
+  {
+    version: 'v1.5', date: '2026-07-20', tags: ['feat'],
+    changes: [
+      'Supabase内に自動バックアップ機能を追加（1日1回・最新10件保持）',
+      '設定タブでバックアップ履歴を確認・ワンクリックで任意時点に復元可能',
+      'JSON手動エクスポートも引き続き利用可能',
+    ]
+  },
   {
     version: 'v1.4', date: '2026-07-19', tags: ['feat'],
     changes: [
