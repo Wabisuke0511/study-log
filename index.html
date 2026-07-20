@@ -935,15 +935,19 @@
     <!-- バックアップカード -->
     <div class="card" style="margin-top:16px">
       <div class="card-title">💾 データバックアップ</div>
-      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 10px;line-height:1.6">全データをJSONファイルとして端末に保存します。月1回程度のバックアップを推奨します。</p>
-      <div id="backupStatus" style="font-size:13px;margin-bottom:12px;min-height:18px"></div>
-      <button class="btn btn-primary" id="backupBtn" onclick="exportBackup()" style="width:100%;margin-bottom:8px">💾 今すぐバックアップ</button>
-      <label style="display:block;width:100%">
-        <div class="btn" id="restoreBtn" style="width:100%;background:var(--bg);border:1.5px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px">
-          📂 バックアップから復元
-        </div>
-        <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="onRestoreFileSelected(this)" />
-      </label>
+      <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px;line-height:1.6">アプリ起動時に自動でSupabase内にスナップショットを作成します（最新10件保持）。</p>
+      <div id="dbBackupList"></div>
+
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:6px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.08em;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px">端末へのエクスポート（完全バックアップ）</div>
+        <button class="btn btn-primary" id="backupBtn" onclick="exportBackup()" style="width:100%;margin-bottom:8px">💾 JSONでダウンロード</button>
+        <label style="display:block;width:100%">
+          <div class="btn" id="restoreBtn" style="width:100%;background:var(--bg);border:1.5px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px">
+            📂 JSONから復元
+          </div>
+          <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="onRestoreFileSelected(this)" />
+        </label>
+      </div>
     </div>
   </div><!-- /panel-settings end of school section -->
 
@@ -2498,7 +2502,7 @@ updateHeader();
 renderStudyRecords();
 renderTestRecords();
 renderSchoolList();
-if (_name) pullFromSupabase();
+if (_name) pullFromSupabase().then(() => autoBackupToDb());
 
 // タブ・アプリに戻ったとき自動で最新データを取得（デバイス間同期）
 document.addEventListener('visibilitychange', () => {
@@ -2776,22 +2780,129 @@ function renderDeviationMasterList() {
 fetchDeviationMasters().then(() => renderDeviationMasterList());
 
 // =====================================================
-//  バックアップ・リストア
+//  バックアップ・リストア（Supabase DB内スナップショット）
 // =====================================================
-function renderBackupStatus() {
-  const el = document.getElementById('backupStatus');
-  if (!el) return;
-  const last = localStorage.getItem('lastBackupDate');
-  if (!last) {
-    el.innerHTML = '<span style="color:var(--danger)">⚠️ まだバックアップが取られていません</span>';
-    return;
+
+// アプリ起動時に1日1回自動バックアップを作成する
+async function autoBackupToDb() {
+  const n = loadName();
+  if (!n) return;
+  const today = new Date().toISOString().slice(0, 10);
+  if (localStorage.getItem('lastDbBackupDate') === today) return;
+
+  try {
+    const [{ data: sd }, { data: td }, { data: sc }, { data: dm }] = await Promise.all([
+      sb.from('study_records').select('*').eq('child_name', n),
+      sb.from('study_test_entries').select('*').eq('child_name', n),
+      sb.from('study_target_schools').select('*').eq('child_name', n),
+      sb.from('study_deviation_masters').select('*'),
+    ]);
+    const snapshot = {
+      version: APP_VERSION,
+      studyRecords:     sd || [],
+      testEntries:      td || [],
+      targetSchools:    sc || [],
+      deviationMasters: dm || [],
+    };
+    await sb.from('study_backups').insert({ child_name: n, data: snapshot });
+
+    // 最新10件だけ残して古いものを削除
+    const { data: all } = await sb.from('study_backups')
+      .select('id')
+      .eq('child_name', n)
+      .order('backed_up_at', { ascending: false });
+    if (all && all.length > 10) {
+      const toDelete = all.slice(10).map(r => r.id);
+      await sb.from('study_backups').delete().in('id', toDelete);
+    }
+
+    localStorage.setItem('lastDbBackupDate', today);
+    console.log('[backup] DB snapshot created:', today);
+  } catch(e) {
+    console.warn('[backup] autoBackupToDb failed:', e.message);
   }
-  const days = Math.floor((Date.now() - new Date(last).getTime()) / 86400000);
-  const color = days > 30 ? 'var(--danger)' : days > 7 ? 'var(--orange, #e67700)' : 'var(--text-secondary)';
-  const warn  = days > 30 ? ' — バックアップを推奨します' : '';
-  el.innerHTML = `<span style="color:${color}">最終バックアップ：${last}（${days}日前）${warn}</span>`;
 }
 
+// 設定タブのバックアップ一覧を描画
+async function renderDbBackupList() {
+  const n = loadName();
+  const el = document.getElementById('dbBackupList');
+  if (!el) return;
+
+  if (!n) {
+    el.innerHTML = '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">お子さん名を設定してください</p>';
+    return;
+  }
+
+  el.innerHTML = '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 8px">⏳ 読込中…</p>';
+  try {
+    const { data, error } = await sb.from('study_backups')
+      .select('id, backed_up_at, data')
+      .eq('child_name', n)
+      .order('backed_up_at', { ascending: false });
+
+    if (error) throw error;
+    if (!data?.length) {
+      el.innerHTML = '<p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">バックアップはまだありません（明日の起動後に自動作成されます）</p>';
+      return;
+    }
+
+    el.innerHTML = data.map(b => {
+      const dt = new Date(b.backed_up_at);
+      const label = `${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+      const counts = b.data
+        ? `勉強${(b.data.studyRecords||[]).length}件・テスト${(b.data.testEntries||[]).length}件`
+        : '';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);gap:8px">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${label}</div>
+          <div style="font-size:12px;color:var(--text-secondary)">${counts}</div>
+        </div>
+        <button onclick="restoreFromDbBackup(${b.id})" style="font-size:12px;padding:5px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--primary);font-weight:600;cursor:pointer;white-space:nowrap">復元</button>
+      </div>`;
+    }).join('') + '<p style="font-size:11px;color:var(--text-secondary);margin:10px 0 0">最新10件を保持。毎日自動バックアップ。</p>';
+  } catch(e) {
+    el.innerHTML = `<p style="font-size:13px;color:var(--danger);margin:0 0 12px">読込失敗: ${e.message}</p>`;
+  }
+}
+
+// Supabaseスナップショットから復元
+async function restoreFromDbBackup(id) {
+  if (!confirm('このバックアップを復元しますか？\n現在のデータは上書きされます。')) return;
+  try {
+    const n = loadName();
+    const { data: row, error } = await sb.from('study_backups')
+      .select('data, backed_up_at')
+      .eq('id', id)
+      .single();
+    if (error || !row) throw new Error('バックアップの取得に失敗しました');
+
+    const snap = row.data;
+    if (snap.studyRecords?.length) {
+      await sb.from('study_records').delete().eq('child_name', n);
+      await sb.from('study_records').insert(snap.studyRecords);
+    }
+    if (snap.testEntries?.length) {
+      await sb.from('study_test_entries').delete().eq('child_name', n);
+      await sb.from('study_test_entries').insert(snap.testEntries);
+    }
+    if (snap.targetSchools?.length) {
+      await sb.from('study_target_schools').delete().eq('child_name', n);
+      await sb.from('study_target_schools').insert(snap.targetSchools);
+    }
+    if (snap.deviationMasters?.length) {
+      await sb.from('study_deviation_masters').upsert(snap.deviationMasters);
+    }
+    await pullFromSupabase();
+    // 復元後は本日のバックアップフラグをリセット（次起動時に新しいスナップショットが取られる）
+    localStorage.removeItem('lastDbBackupDate');
+    alert('✅ 復元が完了しました！');
+  } catch(e) {
+    alert('復元に失敗しました: ' + e.message);
+  }
+}
+
+// JSON手動バックアップ（端末への完全エクスポート）
 async function exportBackup() {
   const btn = document.getElementById('backupBtn');
   btn.textContent = '⏳ 取得中…';
@@ -2820,15 +2931,11 @@ async function exportBackup() {
     a.download = `study-backup-${n}-${new Date().toISOString().slice(0,10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-
-    const today = new Date().toISOString().slice(0, 10);
-    localStorage.setItem('lastBackupDate', today);
-    renderBackupStatus();
-    showSyncStatus('✅ バックアップ完了');
+    showSyncStatus('✅ JSONダウンロード完了');
   } catch(e) {
     alert('バックアップに失敗しました: ' + e.message);
   } finally {
-    btn.textContent = '💾 今すぐバックアップ';
+    btn.textContent = '💾 JSONでダウンロード';
     btn.disabled = false;
   }
 }
@@ -2853,7 +2960,7 @@ function onRestoreFileSelected(input) {
         input.value = '';
         return;
       }
-      restoreFromBackup(data);
+      restoreFromJsonBackup(data);
     } catch(err) {
       alert('ファイルの読み込みに失敗しました: ' + err.message);
       input.value = '';
@@ -2862,7 +2969,7 @@ function onRestoreFileSelected(input) {
   reader.readAsText(file);
 }
 
-async function restoreFromBackup(data) {
+async function restoreFromJsonBackup(data) {
   const restoreEl = document.getElementById('restoreBtn');
   restoreEl.textContent = '⏳ 復元中…';
   try {
@@ -2883,25 +2990,23 @@ async function restoreFromBackup(data) {
       await sb.from('study_deviation_masters').upsert(data.deviationMasters);
     }
     await pullFromSupabase();
+    localStorage.removeItem('lastDbBackupDate');
     alert('✅ 復元が完了しました！');
   } catch(e) {
     alert('復元に失敗しました: ' + e.message);
   } finally {
-    restoreEl.textContent = '📂 バックアップから復元';
+    restoreEl.textContent = '📂 JSONから復元';
     document.getElementById('restoreInput').value = '';
   }
 }
 
-// 設定タブを開くたびにバックアップ状態を更新
+// 設定タブを開くたびにDB バックアップ一覧を更新
 const _origSwitchTab = switchTab;
 // eslint-disable-next-line no-global-assign
 switchTab = function(tab) {
   _origSwitchTab(tab);
-  if (tab === 'settings') renderBackupStatus();
+  if (tab === 'settings') renderDbBackupList();
 };
-
-// 起動時にも表示
-renderBackupStatus();
 </script>
 </body>
 </html>
