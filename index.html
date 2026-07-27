@@ -981,6 +981,16 @@
       <div style="font-size:18px;font-weight:700;margin-bottom:16px">偏差値マスタを追加</div>
 
       <div class="form-group">
+        <label>テスト種別</label>
+        <div style="display:flex;gap:8px">
+          <button class="test-kind-btn active" id="dm_kind_kumiwake" data-kind="組分け"
+            onclick="selectDmKind(this)" style="flex:1;padding:9px 8px;font-size:14px">📊 組分けテスト</button>
+          <button class="test-kind-btn" id="dm_kind_curriculum" data-kind="カリキュラム"
+            onclick="selectDmKind(this)" style="flex:1;padding:9px 8px;font-size:14px">📝 カリキュラムテスト</button>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label>学年</label>
         <select id="dm_grade" style="width:100%;padding:10px;border-radius:10px;border:1.5px solid var(--border);background:var(--card-bg);color:var(--text);font-size:15px">
           <option value="小4">小4</option>
@@ -1047,13 +1057,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.0';
-const BUILD_TIME  = '202607271500';   // yyyymmddhhmm
+const APP_VERSION = 'v2.1';
+const BUILD_TIME  = '202607271600';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.1', date: '2026-07-27', tags: ['feat'],
+    changes: [
+      '偏差値マスタ登録にテスト種別（組分け/カリキュラム）選択を追加',
+      'マスタ一覧にテスト種別アイコンを表示',
+      'テスト入力時の偏差値・平均点自動入力がテスト種別ごとに正しいマスタを参照するように',
+    ]
+  },
   {
     version: 'v2.0', date: '2026-07-27', tags: ['feat'],
     changes: [
@@ -2606,17 +2624,32 @@ const EXTRACT_DEVIATION_URL = `${SUPABASE_URL}/functions/v1/extract-deviation`;
 // メモリキャッシュ（ページ内高速参照用）
 let _dmCache = [];
 
-function dmKey(grade, round, year) { return `${grade}-${round}-${year}`; }
+function dmKey(grade, round, year, kind = '組分け') {
+  if (kind === 'カリキュラム') return `カリキュラム-${grade}-${round}-${year}`;
+  return `組分け-${grade}-${round}-${year}`;
+}
 
 // Supabaseから全マスタ取得してキャッシュ更新
 async function fetchDeviationMasters() {
   const { data, error } = await sb.from('study_deviation_masters').select('*').order('year').order('round');
   if (error) { console.warn('fetchDeviationMasters:', error.message); return; }
-  _dmCache = (data || []).map(r => ({ id: r.id, grade: r.grade, round: r.round, year: r.year, averages: r.averages, rows: r.rows }));
+  _dmCache = (data || []).map(r => ({
+    id: r.id, grade: r.grade, round: r.round, year: r.year,
+    averages: r.averages, rows: r.rows, testKind: r.test_kind || '組分け'
+  }));
 }
 
-function findDeviationMaster(grade, round, year) {
-  return _dmCache.find(m => m.id === dmKey(grade, round, year)) || null;
+function findDeviationMaster(grade, round, year, kind = '組分け') {
+  // 新形式キーで検索
+  const newKey = dmKey(grade, round, year, kind);
+  const found = _dmCache.find(m => m.id === newKey);
+  if (found) return found;
+  // 後方互換：旧形式キー（組分けのみ）
+  if (kind === '組分け') {
+    const oldKey = `${grade}-${round}-${year}`;
+    return _dmCache.find(m => m.id === oldKey) || null;
+  }
+  return null;
 }
 
 // スコアから偏差値を逆引き
@@ -2637,7 +2670,7 @@ function onTestKeyChange() {
   const round = document.getElementById('testRoundInput')?.value;
   const year  = document.getElementById('testYearInput')?.value?.trim();
   if (!grade || !round || !year) return;
-  const master = findDeviationMaster(grade, round, year);
+  const master = findDeviationMaster(grade, round, year, testKind);
   if (!master?.averages) return;
   const avg = master.averages;
   // 一括入力の平均点
@@ -2656,7 +2689,7 @@ function autoCalcSingleDeviation() {
   const round = document.getElementById('testRoundInput')?.value;
   const year  = document.getElementById('testYearInput')?.value?.trim();
   if (!grade || !round || !year) return;
-  const master = findDeviationMaster(grade, round, year);
+  const master = findDeviationMaster(grade, round, year, testKind);
   if (!master) return;
   const sc = parseNum(document.getElementById('s_score').value);
   const dev = lookupDeviation(master, singleSubjKey, sc);
@@ -2672,7 +2705,7 @@ function autoCalcDeviation() {
   const round = document.getElementById('testRoundInput')?.value;
   const year  = document.getElementById('testYearInput')?.value?.trim();
   if (!grade || !round || !year) return;
-  const master = findDeviationMaster(grade, round, year);
+  const master = findDeviationMaster(grade, round, year, testKind);
   if (!master) return;
 
   let total4 = 0, total4count = 0;
@@ -2696,8 +2729,17 @@ let _dmImageBase64 = null;
 let _dmMediaType = null;
 let _dmExtracted = null;
 
+let _dmKind = '組分け';
+
+function selectDmKind(btn) {
+  document.querySelectorAll('#devMasterModal .test-kind-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  _dmKind = btn.dataset.kind;
+}
+
 function openDmModal() {
   _dmImageBase64 = null; _dmMediaType = null; _dmExtracted = null;
+  _dmKind = '組分け';
   document.getElementById('dm_fileInput').value = '';
   document.getElementById('dm_cameraInput').value = '';
   document.getElementById('dm_preview').style.display = 'none';
@@ -2706,6 +2748,9 @@ function openDmModal() {
   document.getElementById('dm_extractBtn').disabled = true;
   document.getElementById('dm_saveBtn').disabled = true;
   document.getElementById('dm_year').value = new Date().getFullYear();
+  // テスト種別をリセット
+  document.getElementById('dm_kind_kumiwake').classList.add('active');
+  document.getElementById('dm_kind_curriculum').classList.remove('active');
   document.getElementById('devMasterModal').classList.remove('hidden');
 }
 
@@ -2825,9 +2870,9 @@ async function saveDmMaster() {
   if (!year) { alert('年度を入力してください'); return; }
 
   const sanitizedRows = sanitizeDeviationRows(_dmExtracted.rows || []);
-  const id = dmKey(grade, round, year);
+  const id = dmKey(grade, round, year, _dmKind);
   const { error } = await sb.from('study_deviation_masters').upsert({
-    id, grade, round, year,
+    id, grade, round, year, test_kind: _dmKind,
     averages: _dmExtracted.averages || null,
     rows: sanitizedRows,
   });
@@ -2850,14 +2895,18 @@ function renderDeviationMasterList() {
   const list = document.getElementById('devMasterList');
   if (!list) return;
   if (!_dmCache.length) { list.innerHTML = '<p style="font-size:13px;color:var(--text-secondary);margin:0">まだ登録がありません</p>'; return; }
-  list.innerHTML = _dmCache.map(m => `
+  const KIND_ICON = { '組分け': '📊', 'カリキュラム': '📝' };
+  list.innerHTML = _dmCache.map(m => {
+    const icon = KIND_ICON[m.testKind] || '📊';
+    return `
     <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;font-size:14px">
       <div>
-        <span style="font-weight:600">${m.grade} ${m.round} ${m.year}年</span>
-        <span style="font-size:12px;color:var(--text-secondary);margin-left:8px">${(m.rows||[]).length}行</span>
+        <div style="font-weight:600">${icon} ${m.grade} ${m.round} ${m.year}年</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${m.testKind || '組分け'} · ${(m.rows||[]).length}行</div>
       </div>
       <button onclick="deleteDeviationMaster('${m.id}')" style="background:none;border:none;color:#e03131;font-size:18px;cursor:pointer;padding:4px">🗑</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // 起動時にSupabaseからマスタを取得
