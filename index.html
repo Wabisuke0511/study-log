@@ -448,7 +448,16 @@
     }
     .cl-items li:last-child { border-bottom: none; }
     .cl-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--primary); flex-shrink: 0; margin-top: 6px; }
-    /* テスト種別セレクタ */
+    /* テスト種別セレクタ（組分け/カリキュラム） */
+    .test-kind-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .test-kind-btn {
+      flex: 1; padding: 9px 8px; border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border); background: var(--input-bg);
+      font-size: 14px; font-weight: 700; color: var(--text-secondary);
+      cursor: pointer; transition: all 0.15s;
+    }
+    .test-kind-btn.active { background: #1864ab; color: #fff; border-color: #1864ab; }
+    /* 過去問/本番セレクタ */
     .test-type-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
     .test-type-btn {
       flex: 1; padding: 9px 8px; border-radius: var(--radius-sm);
@@ -598,7 +607,7 @@
   <!-- ===== 組分けテストタブ（新デザイン） ===== -->
   <div class="tab-panel" id="panel-test">
     <div class="card" id="testFormCard">
-      <div class="card-title">早稲アカ組分けテスト 記録</div>
+      <div class="card-title">テスト記録</div>
 
       <!-- 編集中バナー（編集ボタンを押したときだけ表示） -->
       <div class="edit-mode-banner" id="editModeBanner" style="display:none">
@@ -606,10 +615,18 @@
         <button class="cancel-edit-btn" onclick="cancelEditTest()">キャンセル</button>
       </div>
 
-      <!-- テスト種別 -->
-      <div class="test-type-tabs">
-        <button class="test-type-btn active" data-type="過去問" onclick="selectTestType(this)">📚 過去問</button>
-        <button class="test-type-btn" data-type="本番" onclick="selectTestType(this)">🏆 本番（実際のテスト）</button>
+      <!-- テスト種別：組分け / カリキュラム -->
+      <div class="test-kind-tabs">
+        <button class="test-kind-btn active" data-kind="組分け" onclick="selectTestKind(this)">📊 組分けテスト</button>
+        <button class="test-kind-btn" data-kind="カリキュラム" onclick="selectTestKind(this)">📝 カリキュラムテスト</button>
+      </div>
+
+      <!-- 過去問/本番（組分けテストのみ表示） -->
+      <div id="testTypeTabsWrap">
+        <div class="test-type-tabs">
+          <button class="test-type-btn active" data-type="過去問" onclick="selectTestType(this)">📚 過去問</button>
+          <button class="test-type-btn" data-type="本番" onclick="selectTestType(this)">🏆 本番（実際のテスト）</button>
+        </div>
       </div>
 
       <!-- テスト共通情報 -->
@@ -1030,13 +1047,22 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v1.5';
-const BUILD_TIME  = '202607202200';   // yyyymmddhhmm
+const APP_VERSION = 'v2.0';
+const BUILD_TIME  = '202607271500';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.0', date: '2026-07-27', tags: ['feat'],
+    changes: [
+      'カリキュラムテストの結果を記録できるように（組分けテストと同じ4教科対応）',
+      'テスト入力フォームに「テスト種別」選択を追加（組分け / カリキュラム）',
+      'テスト一覧を3セクションに分類（組分け過去問 / 組分け本番 / カリキュラム）',
+      'グラフのドロップダウンにカリキュラムテストを追加',
+    ]
+  },
   {
     version: 'v1.5', date: '2026-07-20', tags: ['feat'],
     changes: [
@@ -1144,13 +1170,13 @@ function toTestRow(e, n) {
   return { id: e.id, child_name: n, grade: e.grade || null,
            round: e.round || null, year: e.year || null, date: e.date,
            subjects: e.subjects, total_deviation: e.totalDeviation ?? null,
-           type: e.type || '過去問' };
+           type: e.type || '過去問', test_kind: e.testKind || '組分け' };
 }
 function fromTestRow(r) {
   return { id: Number(r.id), grade: r.grade || '', round: r.round || '',
            year: r.year || '', date: r.date, subjects: r.subjects,
            totalDeviation: r.total_deviation ?? null,
-           type: r.type || '過去問' };
+           type: r.type || '過去問', testKind: r.test_kind || '組分け' };
 }
 function toSchoolRow(s, n) {
   const c50 = s.targetDeviationFrom ?? s.targetDeviation ?? 0;
@@ -1625,24 +1651,37 @@ function getSubjectInputs(key) {
   };
 }
 
-let editingTestId   = null;  // 編集中のレコードID
-let inputMode       = 'bulk';
-let singleSubjKey   = 'kokugo';
-let testType        = '過去問'; // '過去問' | '本番'
-let _toggleKakoMon  = true;
-let _toggleHonban   = true;
+let editingTestId    = null;  // 編集中のレコードID
+let inputMode        = 'bulk';
+let singleSubjKey    = 'kokugo';
+let testType         = '過去問';    // '過去問' | '本番'
+let testKind         = '組分け';   // '組分け' | 'カリキュラム'
+let _toggleKakoMon   = true;
+let _toggleHonban    = true;
+let _toggleCurriculum = true;
+
+// 組分け / カリキュラム 切り替え
+function selectTestKind(btn) {
+  document.querySelectorAll('.test-kind-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  testKind = btn.dataset.kind;
+  // カリキュラムテストは常に本番なので過去問/本番タブを非表示
+  document.getElementById('testTypeTabsWrap').style.display =
+    testKind === 'カリキュラム' ? 'none' : '';
+}
 
 // 過去問 / 本番 切り替え
 function selectTestType(btn) {
-  document.querySelectorAll('.test-type-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#testTypeTabsWrap .test-type-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   testType = btn.dataset.type;
 }
 
 // テスト一覧のトグル
 function toggleSection(key) {
-  if (key === 'kakoMon') _toggleKakoMon = !_toggleKakoMon;
-  else                   _toggleHonban  = !_toggleHonban;
+  if (key === 'kakoMon')    _toggleKakoMon    = !_toggleKakoMon;
+  else if (key === 'honban') _toggleHonban    = !_toggleHonban;
+  else                       _toggleCurriculum = !_toggleCurriculum;
   renderTestRecords();
 }
 
@@ -1716,7 +1755,7 @@ function addOrUpdateTestEntry() {
     if (!hasAnyData) { alert('少なくとも1教科の点数・偏差値・平均点のどれかを入力してください'); return; }
 
     const totalDeviation = parseNum(document.getElementById('totalDeviationInput').value);
-    const entry = { id: editingTestId || Date.now(), grade, round, year, date, subjects, totalDeviation, type: testType };
+    const entry = { id: editingTestId || Date.now(), grade, round, year, date, subjects, totalDeviation, type: testKind === 'カリキュラム' ? '本番' : testType, testKind };
 
     if (editingTestId) {
       const idx = entries.findIndex(e => e.id === editingTestId);
@@ -1756,7 +1795,7 @@ function addOrUpdateTestEntry() {
         subjects[s.key] = { score: null, deviation: null, average: null, reviewed: false, reviewDate: null };
       }
       subjects[singleSubjKey] = subData;
-      entries.push({ id: Date.now(), grade, round, year, date, subjects, totalDeviation: newTotalDev, type: testType });
+      entries.push({ id: Date.now(), grade, round, year, date, subjects, totalDeviation: newTotalDev, type: testKind === 'カリキュラム' ? '本番' : testType, testKind });
     }
     clearSingleForm();
   }
@@ -1780,9 +1819,13 @@ function clearTestForm() {
     document.getElementById('reviewDate_' + s.key).style.display = 'none';
   }
   clearSingleForm();
-  // 種別を過去問にリセット
+  // 種別をリセット
+  testKind = '組分け';
+  document.querySelectorAll('.test-kind-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.kind === '組分け'));
+  document.getElementById('testTypeTabsWrap').style.display = '';
   testType = '過去問';
-  document.querySelectorAll('.test-type-btn').forEach(b =>
+  document.querySelectorAll('#testTypeTabsWrap .test-type-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.type === '過去問'));
 }
 
@@ -1815,8 +1858,13 @@ function editTestEntry(id) {
   }
   document.getElementById('totalDeviationInput').value = entry.totalDeviation ?? '';
   // 種別を復元
+  testKind = entry.testKind || '組分け';
+  document.querySelectorAll('.test-kind-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.kind === testKind));
+  document.getElementById('testTypeTabsWrap').style.display =
+    testKind === 'カリキュラム' ? 'none' : '';
   testType = entry.type || '過去問';
-  document.querySelectorAll('.test-type-btn').forEach(b =>
+  document.querySelectorAll('#testTypeTabsWrap .test-type-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.type === testType));
   calcTotalScore();
   document.getElementById('editModeBanner').style.display  = 'flex';
@@ -1857,8 +1905,9 @@ function renderTestRecords() {
     });
   }
 
-  const kakoMon = sortByRoundYear(all.filter(e => (e.type || '過去問') === '過去問'));
-  const honban  = sortByRoundYear(all.filter(e => e.type === '本番'));
+  const kakoMon    = sortByRoundYear(all.filter(e => (e.testKind || '組分け') === '組分け' && (e.type || '過去問') === '過去問'));
+  const honban     = sortByRoundYear(all.filter(e => (e.testKind || '組分け') === '組分け' && e.type === '本番'));
+  const curriculum = sortByRoundYear(all.filter(e => e.testKind === 'カリキュラム'));
 
   function entryHtml(e) {
     let totalScore = 0, scoreCount = 0;
@@ -1935,8 +1984,9 @@ function renderTestRecords() {
   }
 
   container.innerHTML =
-    sectionHtml('kakoMon', '📚 過去問', kakoMon, _toggleKakoMon) +
-    sectionHtml('honban',  '🏆 本番（実際のテスト）', honban, _toggleHonban);
+    sectionHtml('kakoMon',    '📚 組分け（過去問）',       kakoMon,    _toggleKakoMon) +
+    sectionHtml('honban',     '🏆 組分け（本番）',          honban,     _toggleHonban) +
+    sectionHtml('curriculum', '📝 カリキュラムテスト',    curriculum, _toggleCurriculum);
 }
 
 // =====================================================
@@ -2026,41 +2076,58 @@ function renderDeviationChart() {
     return;
   }
 
-  // ドロップダウン：過去問は「学年+回」、本番は「学年+年度」でグループ
-  const TYPE_ICON = { '過去問': '📚', '本番': '🏆' };
+  // ドロップダウン：組分け-過去問「学年+回」、組分け-本番「学年+年度」、カリキュラム「学年+回」でグループ
+  const ENTRY_ICON = { '組分け_過去問': '📚', '組分け_本番': '🏆', 'カリキュラム': '📝' };
   const roundKeys = [...new Set(all.map(g => {
+    const kind = g.testKind || '組分け';
     const type = g.type || '過去問';
+    if (kind === 'カリキュラム') {
+      const keyPart = `${g.grade ? g.grade+' ' : ''}${g.round}`;
+      return `${keyPart}|カリキュラム`;
+    }
     const keyPart = type === '本番'
       ? `${g.grade ? g.grade+' ' : ''}${g.year}年`
       : `${g.grade ? g.grade+' ' : ''}${g.round}`;
-    return `${keyPart}|${type}`;
+    return `${keyPart}|組分け_${type}`;
   }))];
   const sel = document.getElementById('deviationRoundSelect');
   const prevVal = sel.value;
   sel.innerHTML = roundKeys.map(k => {
     const [keyPart, typePart] = k.split('|');
-    const icon = TYPE_ICON[typePart] || '📚';
-    return `<option value="${k}"${k===prevVal?'selected':''}>${icon} ${keyPart}（${typePart}）</option>`;
+    const icon = ENTRY_ICON[typePart] || '📚';
+    const label = typePart === 'カリキュラム' ? 'カリキュラム'
+                : typePart === '組分け_本番'  ? '組分け（本番）'
+                :                               '組分け（過去問）';
+    return `<option value="${k}"${k===prevVal?'selected':''}>${icon} ${keyPart}（${label}）</option>`;
   }).join('');
   const selectedRound = sel.value || roundKeys[0];
 
   const [selectedKeyPart, selectedType] = selectedRound.split('|');
   let groups, labels;
-  if (selectedType === '本番') {
-    // 本番：同じ学年+年度の全回をX軸（第1回→第2回→…）に並べる
+  if (selectedType === 'カリキュラム') {
+    // カリキュラム：同じ学年+回の全記録を実施日順に並べる
+    groups = all
+      .filter(g => {
+        const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
+        return gKey === selectedKeyPart && (g.testKind || '組分け') === 'カリキュラム';
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+    labels = groups.map(g => g.date.substring(0, 7).replace('-', '/'));
+  } else if (selectedType === '組分け_本番') {
+    // 組分け本番：同じ学年+年度の全回をX軸（第1回→第2回→…）に並べる
     groups = all
       .filter(g => {
         const gKey = `${g.grade ? g.grade+' ' : ''}${g.year}年`;
-        return gKey === selectedKeyPart && (g.type || '過去問') === '本番';
+        return gKey === selectedKeyPart && (g.testKind || '組分け') === '組分け' && g.type === '本番';
       })
       .sort((a, b) => (parseInt((a.round||'').replace(/[^0-9]/g,''))||0) - (parseInt((b.round||'').replace(/[^0-9]/g,''))||0));
     labels = groups.map(g => g.round || g.date.substring(5,7)+'月');
   } else {
-    // 過去問：同じ学年+回の全年度をX軸（年度順）に並べる
+    // 組分け過去問：同じ学年+回の全年度をX軸（年度順）に並べる
     groups = all
       .filter(g => {
         const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
-        return gKey === selectedKeyPart && (g.type || '過去問') === '過去問';
+        return gKey === selectedKeyPart && (g.testKind || '組分け') === '組分け' && (g.type || '過去問') === '過去問';
       })
       .sort((a, b) => (a.year || '').localeCompare(b.year || ''));
     labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
