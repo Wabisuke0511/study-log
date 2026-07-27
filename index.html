@@ -1057,13 +1057,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.1';
-const BUILD_TIME  = '202607271600';   // yyyymmddhhmm
+const APP_VERSION = 'v2.2';
+const BUILD_TIME  = '202607271700';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.2', date: '2026-07-27', tags: ['feat'],
+    changes: [
+      'テスト一覧をデフォルト非表示に変更',
+      '各セクション内を「回」ごとのトグルで折りたたみ可能な2層構造に',
+    ]
+  },
   {
     version: 'v2.1', date: '2026-07-27', tags: ['feat'],
     changes: [
@@ -1669,14 +1676,15 @@ function getSubjectInputs(key) {
   };
 }
 
-let editingTestId    = null;  // 編集中のレコードID
-let inputMode        = 'bulk';
-let singleSubjKey    = 'kokugo';
-let testType         = '過去問';    // '過去問' | '本番'
-let testKind         = '組分け';   // '組分け' | 'カリキュラム'
-let _toggleKakoMon   = true;
-let _toggleHonban    = true;
-let _toggleCurriculum = true;
+let editingTestId     = null;  // 編集中のレコードID
+let inputMode         = 'bulk';
+let singleSubjKey     = 'kokugo';
+let testType          = '過去問';    // '過去問' | '本番'
+let testKind          = '組分け';   // '組分け' | 'カリキュラム'
+let _toggleKakoMon    = false;
+let _toggleHonban     = false;
+let _toggleCurriculum = false;
+let _toggleRounds     = {};        // `${sectionKey}-${round}` → boolean
 
 // 組分け / カリキュラム 切り替え
 function selectTestKind(btn) {
@@ -1695,11 +1703,18 @@ function selectTestType(btn) {
   testType = btn.dataset.type;
 }
 
-// テスト一覧のトグル
+// テスト一覧のトグル（上位セクション）
 function toggleSection(key) {
-  if (key === 'kakoMon')    _toggleKakoMon    = !_toggleKakoMon;
-  else if (key === 'honban') _toggleHonban    = !_toggleHonban;
+  if (key === 'kakoMon')     _toggleKakoMon    = !_toggleKakoMon;
+  else if (key === 'honban') _toggleHonban     = !_toggleHonban;
   else                       _toggleCurriculum = !_toggleCurriculum;
+  renderTestRecords();
+}
+
+// テスト一覧のトグル（回ごとの下位セクション）
+function toggleRound(sectionKey, round) {
+  const k = `${sectionKey}-${round}`;
+  _toggleRounds[k] = !_toggleRounds[k];
   renderTestRecords();
 }
 
@@ -1914,7 +1929,6 @@ function renderTestRecords() {
     return;
   }
 
-  // 第X回 → 数値、年度でソート
   function roundNum(r) { return parseInt((r || '').replace(/[^0-9]/g, '')) || 0; }
   function sortByRoundYear(arr) {
     return arr.slice().sort((a, b) => {
@@ -1984,10 +1998,43 @@ function renderTestRecords() {
     </div>`;
   }
 
+  // 回ごとにグループ化（キー：第X回、値：エントリ配列）
+  function groupByRound(entries) {
+    const map = {};
+    for (const e of entries) {
+      const k = e.round || '（回未設定）';
+      if (!map[k]) map[k] = [];
+      map[k].push(e);
+    }
+    return Object.entries(map).sort(([a], [b]) => roundNum(a) - roundNum(b));
+  }
+
+  // 下位セクション：回ごとのトグル
+  function roundSectionHtml(sectionKey, round, entries) {
+    const stateKey = `${sectionKey}-${round}`;
+    const isOpen = !!_toggleRounds[stateKey];
+    const chevron = `<span class="toggle-chevron${isOpen ? ' open' : ''}" style="font-size:11px">▼</span>`;
+    return `<div class="toggle-section" style="margin:0 0 4px 0;border-left:2px solid var(--border);padding-left:10px">
+      <button class="toggle-header" style="padding:8px 10px;font-size:13px;border-radius:8px"
+              onclick="toggleRound('${sectionKey}','${round}')">
+        <div class="toggle-header-left">
+          <span style="font-weight:600">${round}</span>
+          <span class="toggle-count">${entries.length}件</span>
+        </div>
+        ${chevron}
+      </button>
+      <div class="toggle-body${isOpen ? '' : ' hidden'}">
+        <div class="record-list-gap" style="margin-top:6px">${entries.map(entryHtml).join('')}</div>
+      </div>
+    </div>`;
+  }
+
+  // 上位セクション：組分け過去問 / 組分け本番 / カリキュラム
   function sectionHtml(key, label, entries, isOpen) {
     const chevron = `<span class="toggle-chevron${isOpen ? ' open' : ''}">▼</span>`;
-    const body = entries.length
-      ? `<div class="record-list-gap">${entries.map(entryHtml).join('')}</div>`
+    const rounds = groupByRound(entries);
+    const body = rounds.length
+      ? `<div style="padding:8px 4px 4px">${rounds.map(([r, es]) => roundSectionHtml(key, r, es)).join('')}</div>`
       : `<div class="empty-state" style="padding:16px 0"><p>記録がありません</p></div>`;
     return `<div class="toggle-section">
       <button class="toggle-header" onclick="toggleSection('${key}')">
@@ -2002,9 +2049,9 @@ function renderTestRecords() {
   }
 
   container.innerHTML =
-    sectionHtml('kakoMon',    '📚 組分け（過去問）',       kakoMon,    _toggleKakoMon) +
-    sectionHtml('honban',     '🏆 組分け（本番）',          honban,     _toggleHonban) +
-    sectionHtml('curriculum', '📝 カリキュラムテスト',    curriculum, _toggleCurriculum);
+    sectionHtml('kakoMon',    '📚 組分け（過去問）',    kakoMon,    _toggleKakoMon) +
+    sectionHtml('honban',     '🏆 組分け（本番）',      honban,     _toggleHonban) +
+    sectionHtml('curriculum', '📝 カリキュラムテスト', curriculum, _toggleCurriculum);
 }
 
 // =====================================================
