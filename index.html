@@ -1048,6 +1048,22 @@
     </div>
   </div>
 
+  <!-- 偏差値マスタ 詳細・編集モーダル -->
+  <div class="modal-overlay hidden" id="dmViewModal">
+    <div class="modal" style="max-width:640px;width:100%;padding:20px">
+      <div id="dmvm_title" style="font-size:16px;font-weight:700;margin-bottom:16px"></div>
+      <div style="overflow-x:auto;max-height:55vh;overflow-y:auto">
+        <div id="dmvm_body"></div>
+      </div>
+      <div id="dmvm_status" style="font-size:13px;color:var(--text-secondary);margin-top:8px;min-height:18px"></div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button class="btn" style="flex:1" onclick="closeDmViewModal()">閉じる</button>
+        <button class="btn" id="dmvm_editBtn" style="flex:1;background:var(--bg);border:1.5px solid var(--border)" onclick="toggleDmViewEdit()">✏️ 編集</button>
+        <button class="btn btn-primary hidden" id="dmvm_saveBtn" style="flex:1" onclick="saveDmViewEdit()">保存</button>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <script>
@@ -1062,13 +1078,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.5';
-const BUILD_TIME  = '202607281200';   // yyyymmddhhmm
+const APP_VERSION = 'v2.6';
+const BUILD_TIME  = '202607281400';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.6', date: '2026-07-28', tags: ['feat'],
+    changes: [
+      '偏差値マスタに「詳細」ボタンを追加',
+      '詳細モーダルで偏差値×教科のテーブルを確認可能',
+      '編集モードで各セル（偏差値・スコア範囲・平均点）を直接修正してSupabaseに保存できるように',
+    ]
+  },
   {
     version: 'v2.5', date: '2026-07-28', tags: ['feat'],
     changes: [
@@ -3061,6 +3085,167 @@ async function deleteDeviationMaster(id) {
   renderDeviationMasterList();
 }
 
+// =====================================================
+//  偏差値マスタ 詳細・編集
+// =====================================================
+const DM_VIEW_COLS = [
+  { key: 'sansu',  label: '算数' },
+  { key: 'kokugo', label: '国語' },
+  { key: 'rika',   label: '理科' },
+  { key: 'shakai', label: '社会' },
+  { key: 'total2', label: '2科' },
+  { key: 'total3', label: '3科' },
+  { key: 'total4', label: '4科' },
+];
+
+let _dmViewId      = null;
+let _dmViewEditing = false;
+
+function openDmViewModal(id) {
+  const m = _dmCache.find(x => x.id === id);
+  if (!m) return;
+  _dmViewId      = id;
+  _dmViewEditing = false;
+  document.getElementById('dmvm_title').textContent =
+    `${m.grade} ${m.round} ${m.year}年（${m.testKind === 'カリキュラム' ? '📝 カリキュラム' : '📊 組分け'}）`;
+  renderDmViewContent(m, false);
+  document.getElementById('dmvm_status').textContent = '';
+  document.getElementById('dmvm_editBtn').textContent = '✏️ 編集';
+  document.getElementById('dmvm_saveBtn').classList.add('hidden');
+  document.getElementById('dmViewModal').classList.remove('hidden');
+}
+
+function closeDmViewModal() {
+  document.getElementById('dmViewModal').classList.add('hidden');
+}
+
+function renderDmViewContent(m, editing) {
+  const rows     = m.rows     || [];
+  const averages = m.averages || {};
+
+  function rangeText(r) {
+    if (!r || !Array.isArray(r)) return '—';
+    const [mn, mx] = r;
+    if (mn === null || mx === null) return '—';
+    return `${mn}〜${mx}`;
+  }
+
+  const TH = 'padding:5px 7px;background:var(--bg);font-weight:700;font-size:11px;white-space:nowrap;border-bottom:2px solid var(--border);text-align:center;position:sticky;top:0;z-index:1';
+  const TD = 'padding:4px 7px;border-bottom:1px solid var(--border);text-align:center;font-size:12px;white-space:nowrap';
+  const INPUT_STYLE = 'text-align:center;padding:2px 3px;border:1px solid var(--border);border-radius:4px;background:var(--card-bg);color:var(--text);font-size:11px;width:100%;box-sizing:border-box';
+
+  let html = `<table style="width:100%;border-collapse:collapse"><thead>`;
+  html += `<tr><th style="${TH}">偏差値</th>`;
+  DM_VIEW_COLS.forEach(c => { html += `<th style="${TH}">${c.label}</th>`; });
+  html += `</tr>`;
+
+  // Averages row
+  html += `<tr>`;
+  html += `<td style="${TD};font-size:10px;color:var(--text-secondary)">平均点</td>`;
+  DM_VIEW_COLS.forEach(c => {
+    const v = averages[c.key];
+    if (editing) {
+      html += `<td style="${TD}"><input id="dmvm_avg_${c.key}" type="number" value="${v ?? ''}" placeholder="—" style="${INPUT_STYLE};width:56px"></td>`;
+    } else {
+      html += `<td style="${TD};color:var(--text-secondary)">${v ?? '—'}</td>`;
+    }
+  });
+  html += `</tr></thead><tbody>`;
+
+  rows.forEach((row, i) => {
+    html += `<tr>`;
+    if (editing) {
+      html += `<td style="${TD}"><input id="dmvm_dev_${i}" type="number" value="${row.deviation ?? ''}" style="${INPUT_STYLE};width:44px"></td>`;
+    } else {
+      html += `<td style="${TD};font-weight:600">${row.deviation ?? '—'}</td>`;
+    }
+    DM_VIEW_COLS.forEach(c => {
+      const txt = rangeText(row[c.key]);
+      if (editing) {
+        html += `<td style="${TD}"><input id="dmvm_${i}_${c.key}" type="text" value="${txt === '—' ? '' : txt}" placeholder="—" style="${INPUT_STYLE};width:70px"></td>`;
+      } else {
+        html += `<td style="${TD}${txt === '—' ? ';color:var(--text-secondary)' : ''}">${txt}</td>`;
+      }
+    });
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table>`;
+  document.getElementById('dmvm_body').innerHTML = html;
+}
+
+function toggleDmViewEdit() {
+  const m = _dmCache.find(x => x.id === _dmViewId);
+  if (!m) return;
+  _dmViewEditing = !_dmViewEditing;
+  renderDmViewContent(m, _dmViewEditing);
+  document.getElementById('dmvm_editBtn').textContent = _dmViewEditing ? '↩ キャンセル' : '✏️ 編集';
+  document.getElementById('dmvm_saveBtn').classList.toggle('hidden', !_dmViewEditing);
+}
+
+async function saveDmViewEdit() {
+  const m = _dmCache.find(x => x.id === _dmViewId);
+  if (!m) return;
+  const statusEl = document.getElementById('dmvm_status');
+  const saveBtn  = document.getElementById('dmvm_saveBtn');
+
+  function parseRange(str) {
+    if (!str || !str.trim()) return null;
+    const s = str.trim().replace(/[〜～]/g, '~').replace(/[−ー]/g, '-');
+    const parts = s.split(/[~]/);
+    if (parts.length === 2) {
+      const mn = parseFloat(parts[0]);
+      const mx = parseFloat(parts[1]);
+      if (!isNaN(mn) && !isNaN(mx)) return [mn, mx];
+    }
+    const n = parseFloat(s);
+    if (!isNaN(n)) return [n, n];
+    return null;
+  }
+
+  const newAverages = {};
+  DM_VIEW_COLS.forEach(c => {
+    const el = document.getElementById(`dmvm_avg_${c.key}`);
+    if (el && el.value.trim() !== '') newAverages[c.key] = parseFloat(el.value);
+  });
+
+  const rowCount = (m.rows || []).length;
+  const newRows = [];
+  for (let i = 0; i < rowCount; i++) {
+    const devEl = document.getElementById(`dmvm_dev_${i}`);
+    const row   = { deviation: devEl ? parseInt(devEl.value, 10) : null };
+    DM_VIEW_COLS.forEach(c => {
+      const el = document.getElementById(`dmvm_${i}_${c.key}`);
+      row[c.key] = el ? parseRange(el.value) : null;
+    });
+    newRows.push(row);
+  }
+
+  const sanitized = sanitizeDeviationRows(newRows);
+
+  saveBtn.disabled = true;
+  statusEl.textContent = '⏳ 保存中…';
+  try {
+    const { error } = await sb.from('study_deviation_masters').upsert({
+      id: m.id, grade: m.grade, round: m.round, year: m.year, test_kind: m.testKind,
+      averages: newAverages, rows: sanitized,
+    });
+    if (error) { statusEl.textContent = '❌ 保存失敗: ' + error.message; return; }
+    await fetchDeviationMasters();
+    renderDeviationMasterList();
+    const updated = _dmCache.find(x => x.id === _dmViewId);
+    if (updated) renderDmViewContent(updated, false);
+    _dmViewEditing = false;
+    document.getElementById('dmvm_editBtn').textContent = '✏️ 編集';
+    document.getElementById('dmvm_saveBtn').classList.add('hidden');
+    statusEl.textContent = '✅ 保存しました';
+  } catch(e) {
+    statusEl.textContent = '❌ エラー: ' + e.message;
+  } finally {
+    saveBtn.disabled = false;
+  }
+}
+
 function renderDeviationMasterList() {
   const elK = document.getElementById('devMasterList-kumiwake');
   const elC = document.getElementById('devMasterList-curriculum');
@@ -3071,7 +3256,10 @@ function renderDeviationMasterList() {
         <div style="font-weight:600">${m.grade} ${m.round} ${m.year}年</div>
         <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${(m.rows||[]).length}行</div>
       </div>
-      <button onclick="deleteDeviationMaster('${m.id}')" style="background:none;border:none;color:#e03131;font-size:18px;cursor:pointer;padding:4px">🗑</button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button onclick="openDmViewModal('${m.id}')" style="background:none;border:1px solid var(--border);color:var(--text);font-size:12px;padding:4px 10px;border-radius:6px;cursor:pointer">詳細</button>
+        <button onclick="deleteDeviationMaster('${m.id}')" style="background:none;border:none;color:#e03131;font-size:18px;cursor:pointer;padding:4px">🗑</button>
+      </div>
     </div>`;
   }
 
