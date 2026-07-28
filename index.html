@@ -1079,13 +1079,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.7.1';
-const BUILD_TIME  = '202607281800';   // yyyymmddhhmm
+const APP_VERSION = 'v2.8';
+const BUILD_TIME  = '202607281900';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.8', date: '2026-07-28', tags: ['fix'],
+    changes: [
+      '教科別グラフ：組分け（本番）・カリキュラム選択時に棒グラフと横線が出ない不具合を修正（型判定ミス・カリキュラム分岐欠落）',
+      '総合偏差値・教科別グラフのY軸を固定値（45〜70）から動的レンジに変更（志望校偏差値や実データに合わせて自動調整）',
+    ]
+  },
   {
     version: 'v2.7.1', date: '2026-07-28', tags: ['fix'],
     changes: [
@@ -2418,6 +2425,17 @@ function renderDeviationChart() {
     });
   });
 
+  // Y軸レンジを動的計算（全データ値＋志望校ラインを考慮）
+  const allYValues = [
+    ...groups.map(g => g.totalDeviation).filter(v => v != null && v !== 0),
+    56,
+    ...schools.flatMap(s => [s.targetDeviationFrom ?? s.targetDeviation, s.targetDeviationTo ?? s.targetDeviation]).filter(v => v != null),
+  ];
+  const yMinRaw = allYValues.length ? Math.min(...allYValues) : 45;
+  const yMaxRaw = allYValues.length ? Math.max(...allYValues) : 70;
+  const yMin = Math.max(0,  Math.floor((yMinRaw - 5) / 5) * 5);
+  const yMax = Math.min(100, Math.ceil((yMaxRaw + 5) / 5) * 5);
+
   if (chartDeviationInstance) { chartDeviationInstance.destroy(); chartDeviationInstance = null; }
   document.getElementById('deviationChartWrap').innerHTML = `<div class="chart-wrap"><canvas id="chartDeviation"></canvas></div>`;
   chartDeviationInstance = new Chart(document.getElementById('chartDeviation'), {
@@ -2431,7 +2449,7 @@ function renderDeviationChart() {
       },
       scales: {
         y: {
-          min: 45, max: 70,
+          min: yMin, max: yMax,
           ticks: { stepSize: 5 }, grid: { color: '#f0f0f0' },
         },
         x: { grid: { display: false }, ticks: { font: { size: 11 } } }
@@ -2477,11 +2495,19 @@ function renderSubjectCharts() {
   const selectedRound = sel ? sel.value : '';
   const [selectedKeyPart2, selectedType2] = selectedRound.split('|');
   let groups, labels;
-  if (selectedType2 === '本番') {
+  if (selectedType2 === 'カリキュラム') {
+    groups = all
+      .filter(g => {
+        const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
+        return gKey === selectedKeyPart2 && (g.testKind || '組分け') === 'カリキュラム';
+      })
+      .sort((a, b) => a.date.localeCompare(b.date));
+    labels = groups.map(g => g.date.substring(0, 7).replace('-', '/'));
+  } else if (selectedType2 === '組分け_本番') {
     groups = all
       .filter(g => {
         const gKey = `${g.grade ? g.grade+' ' : ''}${g.year}年`;
-        return gKey === selectedKeyPart2 && (g.type || '過去問') === '本番';
+        return gKey === selectedKeyPart2 && (g.testKind || '組分け') === '組分け' && g.type === '本番';
       })
       .sort((a, b) => (parseInt((a.round||'').replace(/[^0-9]/g,''))||0) - (parseInt((b.round||'').replace(/[^0-9]/g,''))||0));
     labels = groups.map(g => g.round || g.date.substring(5,7)+'月');
@@ -2489,13 +2515,23 @@ function renderSubjectCharts() {
     groups = all
       .filter(g => {
         const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
-        return gKey === selectedKeyPart2 && (g.type || '過去問') === '過去問';
+        return gKey === selectedKeyPart2 && (g.testKind || '組分け') === '組分け' && (g.type || '過去問') === '過去問';
       })
       .sort((a, b) => (a.year||'').localeCompare(b.year||''));
     labels = groups.map(g => g.year ? `${g.year}年` : g.date.substring(0,4)+'年');
   }
 
   wrap.innerHTML = TEST_SUBJECTS.map(s => `<div style="margin-bottom:16px;"><div style="font-size:13px;font-weight:600;margin-bottom:4px;color:${s.color}">${s.emoji} ${s.label}</div><div class="chart-wrap"><canvas id="subjectChart_${s.key}"></canvas></div></div>`).join('');
+
+  // 教科別Y軸レンジを全教科のデータから動的計算
+  const allSubjectDevs = groups.flatMap(g =>
+    TEST_SUBJECTS.map(s => { const sub = g.subjects[s.key]; return sub?.deviation ?? null; })
+  ).filter(v => v != null);
+  allSubjectDevs.push(56);
+  const sYMinRaw = Math.min(...allSubjectDevs);
+  const sYMaxRaw = Math.max(...allSubjectDevs);
+  const sYMin = Math.max(0,  Math.floor((sYMinRaw - 5) / 5) * 5);
+  const sYMax = Math.min(100, Math.ceil((sYMaxRaw + 5) / 5) * 5);
 
   TEST_SUBJECTS.forEach(s => {
     if (_subjectChartInstances[s.key]) { _subjectChartInstances[s.key].destroy(); }
@@ -2527,7 +2563,7 @@ function renderSubjectCharts() {
         responsive: true, maintainAspectRatio: true,
         plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `偏差値: ${ctx.parsed.y}` } } },
         scales: {
-          y: { min: 45, max: 70, ticks: { stepSize: 5 }, grid: { color: '#f0f0f0' } },
+          y: { min: sYMin, max: sYMax, ticks: { stepSize: 5 }, grid: { color: '#f0f0f0' } },
           x: { grid: { display: false }, ticks: { font: { size: 11 } } }
         }
       }
