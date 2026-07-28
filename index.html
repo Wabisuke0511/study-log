@@ -1056,13 +1056,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.4';
-const BUILD_TIME  = '202607272000';   // yyyymmddhhmm
+const APP_VERSION = 'v2.4.1';
+const BUILD_TIME  = '202607272100';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.4.1', date: '2026-07-27', tags: ['fix'],
+    changes: [
+      'マスタ保存ボタンが反応しない不具合を修正',
+      '保存エラーをモーダル内にテキスト表示（iOS Safariのalertブロック対策）',
+      '回が未選択のまま保存しようとすると警告を表示',
+    ]
+  },
   {
     version: 'v2.4', date: '2026-07-27', tags: ['feat'],
     changes: [
@@ -1712,12 +1720,13 @@ const KUMIWAKE_ROUNDS   = ['第1回','第2回','第3回','第4回','第5回',
                            '第6回','第7回','第8回','第9回'];
 
 // selectId のオプションを kind に応じて書き換える
+// testRoundInput のみ空オプション（選択）を付ける。dm_round は付けない
 function setRoundOptions(selectId, kind, currentValue = '') {
   const sel = document.getElementById(selectId);
   if (!sel) return;
   const rounds = kind === 'カリキュラム' ? CURRICULUM_ROUNDS : KUMIWAKE_ROUNDS;
-  const hasEmpty = sel.querySelector('option[value=""]') !== null || currentValue === '';
-  sel.innerHTML = (hasEmpty ? '<option value="">選択</option>' : '')
+  const needsEmpty = selectId === 'testRoundInput';
+  sel.innerHTML = (needsEmpty ? '<option value="">選択</option>' : '')
     + rounds.map(r => `<option value="${r}"${r === currentValue ? ' selected' : ''}>${r}</option>`).join('');
 }
 
@@ -2969,24 +2978,42 @@ function sanitizeDeviationRows(rows) {
 }
 
 async function saveDmMaster() {
-  if (!_dmExtracted) return;
+  const statusEl = document.getElementById('dm_extractStatus');
+  const btn      = document.getElementById('dm_saveBtn');
+
+  if (!_dmExtracted) {
+    statusEl.textContent = '❌ 先にAI解析を実行してください';
+    return;
+  }
   const grade = document.getElementById('dm_grade').value;
   const round = document.getElementById('dm_round').value;
   const year  = document.getElementById('dm_year').value.trim();
-  if (!year) { alert('年度を入力してください'); return; }
 
-  const sanitizedRows = sanitizeDeviationRows(_dmExtracted.rows || []);
-  const id = dmKey(grade, round, year, _dmKind);
-  const { error } = await sb.from('study_deviation_masters').upsert({
-    id, grade, round, year, test_kind: _dmKind,
-    averages: _dmExtracted.averages || null,
-    rows: sanitizedRows,
-  });
-  if (error) { alert('保存失敗: ' + error.message); return; }
+  if (!year)  { statusEl.textContent = '❌ 年度を入力してください'; return; }
+  if (!round) { statusEl.textContent = '❌ 回を選択してください';   return; }
 
-  await fetchDeviationMasters();
-  renderDeviationMasterList();
-  closeDmModal();
+  btn.disabled    = true;
+  btn.textContent = '⏳ 保存中…';
+  statusEl.textContent = '';
+  try {
+    const sanitizedRows = sanitizeDeviationRows(_dmExtracted.rows || []);
+    const id = dmKey(grade, round, year, _dmKind);
+    const { error } = await sb.from('study_deviation_masters').upsert({
+      id, grade, round, year, test_kind: _dmKind,
+      averages: _dmExtracted.averages || null,
+      rows: sanitizedRows,
+    });
+    if (error) { statusEl.textContent = '❌ 保存失敗: ' + error.message; return; }
+
+    await fetchDeviationMasters();
+    renderDeviationMasterList();
+    closeDmModal();
+  } catch(e) {
+    statusEl.textContent = '❌ エラー: ' + e.message;
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '保存';
+  }
 }
 
 async function deleteDeviationMaster(id) {
