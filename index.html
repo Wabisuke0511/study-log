@@ -1079,13 +1079,19 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.7';
-const BUILD_TIME  = '202607281700';   // yyyymmddhhmm
+const APP_VERSION = 'v2.7.1';
+const BUILD_TIME  = '202607281800';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.7.1', date: '2026-07-28', tags: ['fix'],
+    changes: [
+      '歯抜け補完ボタンが [値, null] 形式の壊れたセルを見落とすバグを修正',
+    ]
+  },
   {
     version: 'v2.7', date: '2026-07-28', tags: ['feat'],
     changes: [
@@ -3150,8 +3156,8 @@ async function applyDmGapFill() {
   let count = 0;
   (m.rows || []).forEach((row, i) => {
     COLS.forEach(col => {
-      const wasNull = !Array.isArray(row[col]) || row[col][0] === null;
-      const nowFilled = Array.isArray(filled[i][col]) && filled[i][col][0] !== null;
+      const wasNull = !Array.isArray(row[col]) || row[col][0] === null || row[col][1] === null;
+      const nowFilled = Array.isArray(filled[i][col]) && filled[i][col][0] !== null && filled[i][col][1] !== null;
       if (wasNull && nowFilled) count++;
     });
   });
