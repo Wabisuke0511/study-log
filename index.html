@@ -1078,13 +1078,19 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.6.1';
-const BUILD_TIME  = '202607281500';   // yyyymmddhhmm
+const APP_VERSION = 'v2.6.2';
+const BUILD_TIME  = '202607281600';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.6.2', date: '2026-07-28', tags: ['fix'],
+    changes: [
+      '偏差値マスタ詳細で同一値の範囲（例: 100〜100）を単一値表示（100）に改善',
+    ]
+  },
   {
     version: 'v2.6.1', date: '2026-07-28', tags: ['fix'],
     changes: [
@@ -3133,7 +3139,7 @@ function renderDmViewContent(m, editing) {
     if (!r || !Array.isArray(r)) return '—';
     const [mn, mx] = r;
     if (mn === null || mx === null) return '—';
-    return `${mn}〜${mx}`;
+    return mn === mx ? `${mn}` : `${mn}〜${mx}`;
   }
 
   const TH = 'padding:5px 7px;background:var(--bg);font-weight:700;font-size:11px;white-space:nowrap;border-bottom:2px solid var(--border);text-align:center;position:sticky;top:0;z-index:1';
