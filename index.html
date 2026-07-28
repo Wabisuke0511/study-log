@@ -1056,8 +1056,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.4.1';
-const BUILD_TIME  = '202607272100';   // yyyymmddhhmm
+const APP_VERSION = 'v2.4.2';
+const BUILD_TIME  = '202607272200';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
@@ -2963,7 +2963,7 @@ function sanitizeDeviationRows(rows) {
     let prevMin = Infinity;
     for (const row of cleaned) {
       const range = row[col];
-      if (!range) continue;
+      if (!range || !Array.isArray(range)) { row[col] = null; continue; }
       const [mn, mx] = range;
       if (mn === null || mx === null) { row[col] = null; continue; }
       // 偏差値降順なので、スコアの最大値が前の行より大きければ逆転 → null化
