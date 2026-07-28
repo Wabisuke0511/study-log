@@ -949,7 +949,10 @@
       <div class="card-title">📊 偏差値マスタ（組分けテスト）</div>
       <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">組分けテスト用の換算表を登録します。登録後はテスト入力時に偏差値が自動計算されます。</p>
       <button class="btn btn-primary" onclick="openDmModal('組分け')" style="width:100%">＋ 組分けマスタを追加</button>
-      <div id="devMasterList-kumiwake" style="margin-top:12px"></div>
+      <button id="dmToggleKumiwake" onclick="toggleDmList('kumiwake')" style="width:100%;margin-top:10px;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-top:1px solid var(--border);padding:10px 4px;cursor:pointer;font-size:13px;color:var(--text-secondary)">
+        <span>登録済みマスタを確認</span><span class="toggle-chevron">▼</span>
+      </button>
+      <div id="devMasterList-kumiwake" style="display:none;margin-top:4px"></div>
     </div>
 
     <!-- 偏差値マスタ：カリキュラムテスト -->
@@ -957,7 +960,10 @@
       <div class="card-title">📝 偏差値マスタ（カリキュラムテスト）</div>
       <p style="font-size:13px;color:var(--text-secondary);margin:0 0 12px">カリキュラムテスト用の換算表を登録します。登録後はテスト入力時に偏差値が自動計算されます。</p>
       <button class="btn btn-primary" onclick="openDmModal('カリキュラム')" style="width:100%">＋ カリキュラムマスタを追加</button>
-      <div id="devMasterList-curriculum" style="margin-top:12px"></div>
+      <button id="dmToggleCurriculum" onclick="toggleDmList('curriculum')" style="width:100%;margin-top:10px;display:flex;align-items:center;justify-content:space-between;background:none;border:none;border-top:1px solid var(--border);padding:10px 4px;cursor:pointer;font-size:13px;color:var(--text-secondary)">
+        <span>登録済みマスタを確認</span><span class="toggle-chevron">▼</span>
+      </button>
+      <div id="devMasterList-curriculum" style="display:none;margin-top:4px"></div>
     </div>
 
     <!-- バックアップカード -->
@@ -1056,13 +1062,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.4.3';
-const BUILD_TIME  = '202607272300';   // yyyymmddhhmm
+const APP_VERSION = 'v2.5';
+const BUILD_TIME  = '202607281200';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.5', date: '2026-07-28', tags: ['feat'],
+    changes: [
+      '設定画面の偏差値マスタ一覧をデフォルト非表示に変更',
+      '「登録済みマスタを確認」トグルで展開・折りたたみが可能に（組分け・カリキュラム各個別）',
+    ]
+  },
   {
     version: 'v2.4.1', date: '2026-07-27', tags: ['fix'],
     changes: [
@@ -1747,10 +1760,12 @@ let inputMode         = 'bulk';
 let singleSubjKey     = 'kokugo';
 let testType          = '過去問';    // '過去問' | '本番'
 let testKind          = '組分け';   // '組分け' | 'カリキュラム'
-let _toggleKakoMon    = false;
-let _toggleHonban     = false;
-let _toggleCurriculum = false;
-let _toggleRounds     = {};        // `${sectionKey}-${round}` → boolean
+let _toggleKakoMon     = false;
+let _toggleHonban      = false;
+let _toggleCurriculum  = false;
+let _toggleRounds      = {};        // `${sectionKey}-${round}` → boolean
+let _toggleDmKumiwake  = false;
+let _toggleDmCurriculum = false;
 
 // 組分け / カリキュラム 切り替え
 function selectTestKind(btn) {
@@ -1770,6 +1785,25 @@ function selectTestType(btn) {
 }
 
 // テスト一覧のトグル（上位セクション）
+function toggleDmList(key) {
+  if (key === 'kumiwake') _toggleDmKumiwake  = !_toggleDmKumiwake;
+  else                    _toggleDmCurriculum = !_toggleDmCurriculum;
+  applyDmToggleUI(key);
+}
+
+function applyDmToggleUI(key) {
+  const isOpen  = key === 'kumiwake' ? _toggleDmKumiwake : _toggleDmCurriculum;
+  const listId  = key === 'kumiwake' ? 'devMasterList-kumiwake' : 'devMasterList-curriculum';
+  const btnId   = key === 'kumiwake' ? 'dmToggleKumiwake'       : 'dmToggleCurriculum';
+  const listEl  = document.getElementById(listId);
+  const btnEl   = document.getElementById(btnId);
+  if (listEl) listEl.style.display = isOpen ? 'block' : 'none';
+  if (btnEl) {
+    const chevron = btnEl.querySelector('.toggle-chevron');
+    if (chevron) chevron.classList.toggle('open', isOpen);
+  }
+}
+
 function toggleSection(key) {
   if (key === 'kakoMon')     _toggleKakoMon    = !_toggleKakoMon;
   else if (key === 'honban') _toggleHonban     = !_toggleHonban;
@@ -3051,6 +3085,8 @@ function renderDeviationMasterList() {
     const items = _dmCache.filter(m => m.testKind === 'カリキュラム');
     elC.innerHTML = items.length ? items.map(itemHtml).join('') : empty;
   }
+  applyDmToggleUI('kumiwake');
+  applyDmToggleUI('curriculum');
 }
 
 // 起動時にSupabaseからマスタを取得
