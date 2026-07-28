@@ -1078,13 +1078,19 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.6';
-const BUILD_TIME  = '202607281400';   // yyyymmddhhmm
+const APP_VERSION = 'v2.6.1';
+const BUILD_TIME  = '202607281500';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.6.1', date: '2026-07-28', tags: ['fix'],
+    changes: [
+      '偏差値マスタ詳細画面で偏差値列が「—」になるバグを修正（フィールド名 deviation → dev に統一）',
+    ]
+  },
   {
     version: 'v2.6', date: '2026-07-28', tags: ['feat'],
     changes: [
@@ -3155,9 +3161,9 @@ function renderDmViewContent(m, editing) {
   rows.forEach((row, i) => {
     html += `<tr>`;
     if (editing) {
-      html += `<td style="${TD}"><input id="dmvm_dev_${i}" type="number" value="${row.deviation ?? ''}" style="${INPUT_STYLE};width:44px"></td>`;
+      html += `<td style="${TD}"><input id="dmvm_dev_${i}" type="number" value="${row.dev ?? ''}" style="${INPUT_STYLE};width:44px"></td>`;
     } else {
-      html += `<td style="${TD};font-weight:600">${row.deviation ?? '—'}</td>`;
+      html += `<td style="${TD};font-weight:600">${row.dev ?? '—'}</td>`;
     }
     DM_VIEW_COLS.forEach(c => {
       const txt = rangeText(row[c.key]);
@@ -3213,7 +3219,7 @@ async function saveDmViewEdit() {
   const newRows = [];
   for (let i = 0; i < rowCount; i++) {
     const devEl = document.getElementById(`dmvm_dev_${i}`);
-    const row   = { deviation: devEl ? parseInt(devEl.value, 10) : null };
+    const row   = { dev: devEl ? parseInt(devEl.value, 10) : null };
     DM_VIEW_COLS.forEach(c => {
       const el = document.getElementById(`dmvm_${i}_${c.key}`);
       row[c.key] = el ? parseRange(el.value) : null;
