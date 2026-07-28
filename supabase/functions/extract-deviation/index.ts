@@ -33,15 +33,15 @@ serve(async (req) => {
               type: 'text',
               text: `中学受験の偏差値換算表です。JSONのみ出力（説明・コードブロック不要）。
 
-形式：
-{"grade":"小4","round":"第4回","year":"2025","averages":{"sansu":99,"kokugo":82,"rika":68,"shakai":66,"total2":181,"total3":249,"total4":315},"rows":[{"dev":75,"sansu":[196,199],"kokugo":[143,144],"rika":null,"shakai":null,"total2":null,"total3":null,"total4":null}]}
+形式（例：dev80は単一値100→[100,100]、dev79は範囲98〜99→[98,99]、dev78は単一値97→[97,97]）：
+{"grade":"小5","round":"第4回","year":"2025","averages":{"sansu":99,"kokugo":82,"rika":68,"shakai":66,"total2":181,"total3":249,"total4":315},"rows":[{"dev":80,"sansu":[100,100],"kokugo":null,"rika":null,"shakai":null,"total2":null,"total3":null,"total4":null},{"dev":79,"sansu":[98,99],"kokugo":null,"rika":null,"shakai":null,"total2":null,"total3":null,"total4":null},{"dev":78,"sansu":[97,97],"kokugo":null,"rika":null,"shakai":null,"total2":null,"total3":null,"total4":null}]}
 
 ルール：
 - grade: 画像中の「4年」「5年」「6年」などを探す→「小4」「小5」「小6」に変換。タイトル・右上・左上・ヘッダーなど全体を確認。不明な場合はnull
 - round: 「第1回」「第2回」…「第8回」などを探す。タイトルや欄外も確認。不明な場合はnull
 - year: 西暦4桁を探す（「2024年度」「2025」など）。和暦なら西暦に変換。不明な場合はnull
 - rowsは偏差値降順で全行
-- 範囲は[最小,最大]、単一値は[n,n]、空欄はnull
+- 【最重要】セルに値がある場合は必ず配列で出力すること：範囲（98〜99）→[98,99]、単一値（97）→[97,97]。nullは「セルが完全に空欄」のときだけ使う
 - averagesは「平均」行から取得
 - 存在しない列はnull固定
 - スペース・改行を最小限にしてコンパクトに出力
