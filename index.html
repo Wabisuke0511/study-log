@@ -1056,13 +1056,22 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.3';
-const BUILD_TIME  = '202607271800';   // yyyymmddhhmm
+const APP_VERSION = 'v2.4';
+const BUILD_TIME  = '202607272000';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.4', date: '2026-07-27', tags: ['feat'],
+    changes: [
+      'カリキュラムテストの「回」選択肢をペア表記に変更（第1-2回、第3-4回…）',
+      '5の倍数を含む回（総合回）は選択肢から除外',
+      '組分けテストの回選択肢は従来どおり（第1回〜第9回）のまま',
+      '既存の単一回データを自動でペア表記にマイグレーション',
+    ]
+  },
   {
     version: 'v2.3', date: '2026-07-27', tags: ['feat'],
     changes: [
@@ -1682,6 +1691,48 @@ function getSubjectInputs(key) {
   };
 }
 
+// =====================================================
+//  カリキュラムテストの回ペア生成
+// =====================================================
+
+// 1から始まり、5の倍数を除外しながら2つずつペアにする
+function generateCurriculumRoundPairs(maxN = 30) {
+  const pairs = [];
+  let n = 1;
+  while (n <= maxN) {
+    if (n % 5 === 0) { n++; continue; }
+    pairs.push(`第${n}-${n + 1}回`);
+    n += 2;
+  }
+  return pairs;
+}
+// 小4-小6 は30回まで（第1-2回〜第28-29回の12ペア）
+const CURRICULUM_ROUNDS = generateCurriculumRoundPairs(30);
+const KUMIWAKE_ROUNDS   = ['第1回','第2回','第3回','第4回','第5回',
+                           '第6回','第7回','第8回','第9回'];
+
+// selectId のオプションを kind に応じて書き換える
+function setRoundOptions(selectId, kind, currentValue = '') {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const rounds = kind === 'カリキュラム' ? CURRICULUM_ROUNDS : KUMIWAKE_ROUNDS;
+  const hasEmpty = sel.querySelector('option[value=""]') !== null || currentValue === '';
+  sel.innerHTML = (hasEmpty ? '<option value="">選択</option>' : '')
+    + rounds.map(r => `<option value="${r}"${r === currentValue ? ' selected' : ''}>${r}</option>`).join('');
+}
+
+// 単一回（"第3回"等）→ カリキュラムペア（"第3-4回"）へのマッピング
+function migrateSingleToPairRound(round) {
+  if (!round || round.includes('-')) return round; // 既にペア or 空
+  const num = parseInt((round).replace(/[^0-9]/g, ''));
+  if (!num) return round;
+  for (const p of CURRICULUM_ROUNDS) {
+    const [a, b] = p.replace('第', '').replace('回', '').split('-').map(Number);
+    if (num === a || num === b) return p;
+  }
+  return round;
+}
+
 let editingTestId     = null;  // 編集中のレコードID
 let inputMode         = 'bulk';
 let singleSubjKey     = 'kokugo';
@@ -1697,9 +1748,9 @@ function selectTestKind(btn) {
   document.querySelectorAll('.test-kind-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   testKind = btn.dataset.kind;
-  // カリキュラムテストは常に本番なので過去問/本番タブを非表示
   document.getElementById('testTypeTabsWrap').style.display =
     testKind === 'カリキュラム' ? 'none' : '';
+  setRoundOptions('testRoundInput', testKind);
 }
 
 // 過去問 / 本番 切り替え
@@ -1863,6 +1914,7 @@ function clearTestForm() {
   document.querySelectorAll('.test-kind-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.kind === '組分け'));
   document.getElementById('testTypeTabsWrap').style.display = '';
+  setRoundOptions('testRoundInput', '組分け');
   testType = '過去問';
   document.querySelectorAll('#testTypeTabsWrap .test-type-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.type === '過去問'));
@@ -1896,12 +1948,14 @@ function editTestEntry(id) {
     document.getElementById('reviewDate_' + s.key).style.display = sub.reviewed ? 'inline-block' : 'none';
   }
   document.getElementById('totalDeviationInput').value = entry.totalDeviation ?? '';
-  // 種別を復元
+  // 種別を復元（先にroundOptionsを更新してからroundをセット）
   testKind = entry.testKind || '組分け';
   document.querySelectorAll('.test-kind-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.kind === testKind));
   document.getElementById('testTypeTabsWrap').style.display =
     testKind === 'カリキュラム' ? 'none' : '';
+  setRoundOptions('testRoundInput', testKind, entry.round);
+  document.getElementById('testRoundInput').value = entry.round;
   testType = entry.type || '過去問';
   document.querySelectorAll('#testTypeTabsWrap .test-type-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.type === testType));
@@ -2657,7 +2711,10 @@ updateHeader();
 renderStudyRecords();
 renderTestRecords();
 renderSchoolList();
-if (_name) pullFromSupabase().then(() => autoBackupToDb());
+if (_name) pullFromSupabase().then(() => {
+  migrateCurriculumRoundsOnce();
+  autoBackupToDb();
+});
 
 // タブ・アプリに戻ったとき自動で最新データを取得（デバイス間同期）
 document.addEventListener('visibilitychange', () => {
@@ -2795,10 +2852,11 @@ function openDmModal(kind = '組分け') {
   document.getElementById('dm_extractBtn').disabled = true;
   document.getElementById('dm_saveBtn').disabled = true;
   document.getElementById('dm_year').value = new Date().getFullYear();
-  // 種別ラベルを表示
+  // 種別ラベル・回選択肢を更新
   const isKuriku = kind === 'カリキュラム';
   document.getElementById('dm_modal_emoji').textContent = isKuriku ? '📝' : '📊';
   document.getElementById('dm_kind_label').textContent  = isKuriku ? '📝 カリキュラムテスト' : '📊 組分けテスト';
+  setRoundOptions('dm_round', kind);
   document.getElementById('devMasterModal').classList.remove('hidden');
 }
 
@@ -2967,6 +3025,35 @@ function renderDeviationMasterList() {
 
 // 起動時にSupabaseからマスタを取得
 fetchDeviationMasters().then(() => renderDeviationMasterList());
+
+// =====================================================
+//  カリキュラム回マイグレーション（単一回→ペア表記）
+// =====================================================
+async function migrateCurriculumRoundsOnce() {
+  const entries = loadTestData();
+  const targets = entries.filter(e =>
+    e.testKind === 'カリキュラム' && e.round && !e.round.includes('-')
+  );
+  if (!targets.length) return;
+
+  for (const e of entries) {
+    if (e.testKind === 'カリキュラム' && e.round && !e.round.includes('-')) {
+      e.round = migrateSingleToPairRound(e.round);
+    }
+  }
+  saveTestData(entries);
+  renderTestRecords();
+
+  const n = loadName();
+  if (!n) return;
+  try {
+    await sb.from('study_test_entries').delete().eq('child_name', n);
+    await sb.from('study_test_entries').insert(entries.map(e => toTestRow(e, n)));
+    console.log(`[migrate] ${targets.length}件のカリキュラム回をペア表記に更新しました`);
+  } catch(err) {
+    console.warn('[migrate] Supabase更新失敗:', err.message);
+  }
+}
 
 // =====================================================
 //  バックアップ・リストア（Supabase DB内スナップショット）
