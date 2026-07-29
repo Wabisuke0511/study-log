@@ -1079,13 +1079,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.8';
-const BUILD_TIME  = '202607281900';   // yyyymmddhhmm
+const APP_VERSION = 'v2.9';
+const BUILD_TIME  = '202607282000';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.9', date: '2026-07-28', tags: ['feat'],
+    changes: [
+      'グラフのドロップダウンでカリキュラムテストを学年単位に統合（回ごとに分かれていたのを1つに）',
+      'カリキュラムのX軸を回順（第13-14回→第16-17回…）で表示',
+    ]
+  },
   {
     version: 'v2.8', date: '2026-07-28', tags: ['fix'],
     changes: [
@@ -2301,14 +2308,14 @@ function renderDeviationChart() {
     return;
   }
 
-  // ドロップダウン：組分け-過去問「学年+回」、組分け-本番「学年+年度」、カリキュラム「学年+回」でグループ
+  // ドロップダウン：組分け-過去問「学年+回」、組分け-本番「学年+年度」、カリキュラム「学年」で統合
   const ENTRY_ICON = { '組分け_過去問': '📚', '組分け_本番': '🏆', 'カリキュラム': '📝' };
   const roundKeys = [...new Set(all.map(g => {
     const kind = g.testKind || '組分け';
     const type = g.type || '過去問';
     if (kind === 'カリキュラム') {
-      const keyPart = `${g.grade ? g.grade+' ' : ''}${g.round}`;
-      return `${keyPart}|カリキュラム`;
+      // カリキュラムは学年単位で統合（回ごとに分けない）
+      return `${g.grade || ''}|カリキュラム`;
     }
     const keyPart = type === '本番'
       ? `${g.grade ? g.grade+' ' : ''}${g.year}年`
@@ -2330,14 +2337,15 @@ function renderDeviationChart() {
   const [selectedKeyPart, selectedType] = selectedRound.split('|');
   let groups, labels;
   if (selectedType === 'カリキュラム') {
-    // カリキュラム：同じ学年+回の全記録を実施日順に並べる
+    // カリキュラム：同じ学年の全記録を回順に並べる（X軸=回）
     groups = all
-      .filter(g => {
-        const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
-        return gKey === selectedKeyPart && (g.testKind || '組分け') === 'カリキュラム';
-      })
-      .sort((a, b) => a.date.localeCompare(b.date));
-    labels = groups.map(g => g.date.substring(0, 7).replace('-', '/'));
+      .filter(g => (g.grade || '') === selectedKeyPart && (g.testKind || '組分け') === 'カリキュラム')
+      .sort((a, b) => {
+        const aNum = parseInt((a.round || '').match(/第(\d+)/)?.[1] || '0');
+        const bNum = parseInt((b.round || '').match(/第(\d+)/)?.[1] || '0');
+        return aNum - bNum || a.date.localeCompare(b.date);
+      });
+    labels = groups.map(g => g.round || g.date.substring(0, 7).replace('-', '/'));
   } else if (selectedType === '組分け_本番') {
     // 組分け本番：同じ学年+年度の全回をX軸（第1回→第2回→…）に並べる
     groups = all
@@ -2497,12 +2505,13 @@ function renderSubjectCharts() {
   let groups, labels;
   if (selectedType2 === 'カリキュラム') {
     groups = all
-      .filter(g => {
-        const gKey = `${g.grade ? g.grade+' ' : ''}${g.round}`;
-        return gKey === selectedKeyPart2 && (g.testKind || '組分け') === 'カリキュラム';
-      })
-      .sort((a, b) => a.date.localeCompare(b.date));
-    labels = groups.map(g => g.date.substring(0, 7).replace('-', '/'));
+      .filter(g => (g.grade || '') === selectedKeyPart2 && (g.testKind || '組分け') === 'カリキュラム')
+      .sort((a, b) => {
+        const aNum = parseInt((a.round || '').match(/第(\d+)/)?.[1] || '0');
+        const bNum = parseInt((b.round || '').match(/第(\d+)/)?.[1] || '0');
+        return aNum - bNum || a.date.localeCompare(b.date);
+      });
+    labels = groups.map(g => g.round || g.date.substring(0, 7).replace('-', '/'));
   } else if (selectedType2 === '組分け_本番') {
     groups = all
       .filter(g => {
