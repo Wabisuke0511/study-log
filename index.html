@@ -63,8 +63,8 @@
     /* ── タブバー ── */
     .tab-bar { display: flex; }
     .tab-btn {
-      flex: 1; padding: 10px 4px; border: none; background: none;
-      font-size: 13px; font-weight: 600; color: var(--text-secondary);
+      flex: 1; padding: 10px 2px; border: none; background: none;
+      font-size: 12px; font-weight: 600; color: var(--text-secondary);
       cursor: pointer; border-bottom: 2.5px solid transparent;
       transition: color 0.15s, border-color 0.15s;
       display: flex; align-items: center; justify-content: center; gap: 4px;
@@ -489,6 +489,66 @@
       font-size: 11px; font-weight: 700; padding: 2px 7px;
       border-radius: 6px; background: #fff3e0; color: #e67700;
     }
+
+    /* ── テストスケジュール（カレンダー） ── */
+    .cal-nav {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 14px;
+    }
+    .cal-nav-btn {
+      width: 36px; height: 36px; flex-shrink: 0;
+      border: 1px solid var(--border); background: var(--card);
+      border-radius: var(--radius-sm); cursor: pointer;
+      font-size: 15px; color: var(--primary); font-weight: 700;
+    }
+    .cal-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .cal-month-select {
+      flex: 1; padding: 9px 10px; font-size: 16px; font-weight: 700;
+      text-align: center; text-align-last: center;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--card); color: var(--text); cursor: pointer;
+    }
+    .cal-today-btn {
+      flex-shrink: 0; padding: 9px 12px; font-size: 13px; font-weight: 600;
+      border: none; border-radius: var(--radius-sm);
+      background: var(--input-bg); color: var(--primary); cursor: pointer;
+    }
+    .cal-today-btn:disabled { opacity: 0.35; cursor: default; color: var(--text-secondary); }
+
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-dow {
+      text-align: center; font-size: 11px; font-weight: 700;
+      color: var(--text-secondary); padding: 4px 0 6px;
+    }
+    .cal-dow.sun { color: var(--danger); }
+    .cal-dow.sat { color: #1c7ed6; }
+
+    .cal-cell {
+      min-height: 54px; border-radius: var(--radius-sm);
+      background: var(--input-bg); padding: 4px 3px 3px;
+      display: flex; flex-direction: column; align-items: stretch;
+      border: 1.5px solid transparent; cursor: pointer;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .cal-cell.empty { background: none; cursor: default; }
+    .cal-cell.out-of-range { background: none; cursor: default; opacity: 0.28; }
+    .cal-cell.today { border-color: var(--primary); }
+    .cal-cell.selected { background: #e3f0ff; border-color: var(--primary); }
+    .cal-day {
+      font-size: 13px; font-weight: 600; text-align: center; line-height: 1.3;
+    }
+    .cal-cell.sun  .cal-day { color: var(--danger); }
+    .cal-cell.sat  .cal-day { color: #1c7ed6; }
+    .cal-cell.today .cal-day { color: var(--primary); font-weight: 800; }
+    .cal-events { flex: 1; display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
+
+    .cal-detail {
+      margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
+    }
+    .cal-detail-date { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .cal-detail-empty { font-size: 13px; color: var(--text-secondary); }
+    .cal-range-note {
+      font-size: 12px; color: var(--text-secondary); margin-top: 12px; text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -534,6 +594,7 @@
   <div class="tab-bar">
     <button class="tab-btn active" id="tab-study"    onclick="switchTab('study')">⏱ 勉強時間</button>
     <button class="tab-btn" id="tab-test"     onclick="switchTab('test')">📝 テスト</button>
+    <button class="tab-btn" id="tab-schedule" onclick="switchTab('schedule')">📅 日程</button>
     <button class="tab-btn" id="tab-dash"     onclick="switchTab('dash')">📊 グラフ</button>
     <button class="tab-btn" id="tab-settings" onclick="switchTab('settings')">⚙️ 設定</button>
   </div>
@@ -851,6 +912,25 @@
     <div class="record-list-gap" id="testRecordList"></div>
   </div>
 
+  <!-- ===== テストスケジュールタブ ===== -->
+  <div class="tab-panel" id="panel-schedule">
+    <div class="card">
+      <div class="card-title">📅 テストスケジュール</div>
+
+      <div class="cal-nav">
+        <button class="cal-nav-btn" id="calPrevBtn" onclick="changeCalMonth(-1)">◀</button>
+        <select class="cal-month-select" id="calMonthSelect" onchange="onCalMonthSelect()"></select>
+        <button class="cal-nav-btn" id="calNextBtn" onclick="changeCalMonth(1)">▶</button>
+        <button class="cal-today-btn" id="calTodayBtn" onclick="goToCalToday()">今日</button>
+      </div>
+
+      <div class="cal-grid" id="calGrid"></div>
+
+      <div class="cal-detail" id="calDetail"></div>
+      <div class="cal-range-note" id="calRangeNote"></div>
+    </div>
+  </div>
+
   <!-- ===== ダッシュボードタブ ===== -->
   <div class="tab-panel" id="panel-dash">
 
@@ -1079,13 +1159,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.9';
-const BUILD_TIME  = '202607282000';   // yyyymmddhhmm
+const APP_VERSION = 'v2.10';
+const BUILD_TIME  = '202609011200';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.10', date: '2026-09-01', tags: ['feat'],
+    changes: [
+      '「📅 日程」タブを新設（テストスケジュール）',
+      '2026年9月〜2029年3月のカレンダーを月表示。前後移動・月ジャンプ・「今日」ボタンに対応',
+      '日付をタップするとその日の詳細を表示（予定の登録は次のステップで追加予定）',
+    ]
+  },
   {
     version: 'v2.9', date: '2026-07-28', tags: ['feat'],
     changes: [
@@ -1509,6 +1597,7 @@ function switchTab(tab) {
   document.getElementById('panel-' + tab).classList.add('active');
   if (tab === 'dash')     renderDashboard();
   if (tab === 'settings') renderSchoolList();
+  if (tab === 'schedule') renderCalendar();
 }
 
 // =====================================================
@@ -2828,10 +2917,148 @@ function renderSchoolList() {
 }
 
 // =====================================================
+//  テストスケジュール（カレンダー）
+// =====================================================
+// 表示できる期間：2026年9月1日 〜 2029年3月31日
+const CAL_START = { y: 2026, m: 9 };
+const CAL_END   = { y: 2029, m: 3 };
+const CAL_START_DATE = '2026-09-01';
+const CAL_END_DATE   = '2029-03-31';
+const CAL_DOW = ['日','月','火','水','木','金','土'];
+
+// 表示中の月と選択中の日付
+let calYear  = CAL_START.y;
+let calMonth = CAL_START.m;
+let calSelectedDate = null;
+
+// 年月を「開始月からの通し番号」に変換する（範囲判定・前後移動用）
+function calMonthIndex(y, m) { return y * 12 + (m - 1); }
+const CAL_MIN_IDX = calMonthIndex(CAL_START.y, CAL_START.m);
+const CAL_MAX_IDX = calMonthIndex(CAL_END.y, CAL_END.m);
+
+function dateString(y, m, d) {
+  return `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+}
+function isInCalRange(ds) {
+  return ds >= CAL_START_DATE && ds <= CAL_END_DATE;
+}
+
+// 今日が範囲内ならその月、範囲外なら一番近い端の月を初期表示にする
+function initCalMonth() {
+  const t = todayString();
+  const [ty, tm] = t.split('-').map(Number);
+  const idx = calMonthIndex(ty, tm);
+  const clamped = Math.min(Math.max(idx, CAL_MIN_IDX), CAL_MAX_IDX);
+  calYear  = Math.floor(clamped / 12);
+  calMonth = (clamped % 12) + 1;
+}
+
+// 月セレクトの選択肢（2026年9月〜2029年3月）を一度だけ作る
+function buildCalMonthOptions() {
+  const sel = document.getElementById('calMonthSelect');
+  if (sel.options.length) return;
+  let html = '';
+  for (let i = CAL_MIN_IDX; i <= CAL_MAX_IDX; i++) {
+    const y = Math.floor(i / 12), m = (i % 12) + 1;
+    html += `<option value="${y}-${m}">${y}年${m}月</option>`;
+  }
+  sel.innerHTML = html;
+}
+
+function changeCalMonth(delta) {
+  const idx = calMonthIndex(calYear, calMonth) + delta;
+  if (idx < CAL_MIN_IDX || idx > CAL_MAX_IDX) return;
+  calYear  = Math.floor(idx / 12);
+  calMonth = (idx % 12) + 1;
+  renderCalendar();
+}
+
+function onCalMonthSelect() {
+  const [y, m] = document.getElementById('calMonthSelect').value.split('-').map(Number);
+  calYear = y; calMonth = m;
+  renderCalendar();
+}
+
+// 今日の月へ移動して今日を選択する（範囲外の日は何もしない）
+function goToCalToday() {
+  const t = todayString();
+  if (!isInCalRange(t)) return;
+  const [y, m] = t.split('-').map(Number);
+  calYear = y; calMonth = m; calSelectedDate = t;
+  renderCalendar();
+}
+
+function selectCalDate(ds) {
+  calSelectedDate = (calSelectedDate === ds) ? null : ds;
+  renderCalendar();
+}
+
+function renderCalendar() {
+  buildCalMonthOptions();
+
+  const today   = todayString();
+  const idx     = calMonthIndex(calYear, calMonth);
+  const firstDow = new Date(calYear, calMonth - 1, 1).getDay();
+  const lastDay  = new Date(calYear, calMonth, 0).getDate();
+
+  document.getElementById('calMonthSelect').value = `${calYear}-${calMonth}`;
+  document.getElementById('calPrevBtn').disabled  = idx <= CAL_MIN_IDX;
+  document.getElementById('calNextBtn').disabled  = idx >= CAL_MAX_IDX;
+  document.getElementById('calTodayBtn').disabled = !isInCalRange(today);
+
+  let html = CAL_DOW.map((d, i) =>
+    `<div class="cal-dow ${i === 0 ? 'sun' : i === 6 ? 'sat' : ''}">${d}</div>`
+  ).join('');
+
+  // 1日の曜日まで空セルで埋める
+  for (let i = 0; i < firstDow; i++) html += '<div class="cal-cell empty"></div>';
+
+  for (let d = 1; d <= lastDay; d++) {
+    const ds  = dateString(calYear, calMonth, d);
+    const dow = new Date(calYear, calMonth - 1, d).getDay();
+    if (!isInCalRange(ds)) {
+      html += `<div class="cal-cell out-of-range"><div class="cal-day">${d}</div></div>`;
+      continue;
+    }
+    const cls = [
+      'cal-cell',
+      dow === 0 ? 'sun' : dow === 6 ? 'sat' : '',
+      ds === today ? 'today' : '',
+      ds === calSelectedDate ? 'selected' : '',
+    ].filter(Boolean).join(' ');
+    html += `<div class="${cls}" data-date="${ds}" onclick="selectCalDate('${ds}')">
+      <div class="cal-day">${d}</div>
+      <div class="cal-events" id="calEvents-${ds}"></div>
+    </div>`;
+  }
+
+  // 最終週の余りを空セルで埋めてグリッドを揃える
+  const trailing = (7 - ((firstDow + lastDay) % 7)) % 7;
+  for (let i = 0; i < trailing; i++) html += '<div class="cal-cell empty"></div>';
+
+  document.getElementById('calGrid').innerHTML = html;
+
+  const detail = document.getElementById('calDetail');
+  if (calSelectedDate) {
+    detail.innerHTML = `
+      <div class="cal-detail-date">${calSelectedDate.split('-')[0]}年${formatDate(calSelectedDate)}</div>
+      <div class="cal-detail-empty">この日の予定はまだ登録されていません。</div>`;
+    detail.style.display = 'block';
+  } else {
+    detail.innerHTML = '';
+    detail.style.display = 'none';
+  }
+
+  document.getElementById('calRangeNote').textContent =
+    `表示できる期間：${CAL_START.y}年${CAL_START.m}月 〜 ${CAL_END.y}年${CAL_END.m}月`;
+}
+
+// =====================================================
 //  起動時の処理
 // =====================================================
 // 旧形式のテストデータを自動クリア（ユーザーが「消してOK」と確認済み）
 migrateTestData();
+initCalMonth();
 
 // 日付の初期値をセット（今日）
 studyViewDate = todayString();
