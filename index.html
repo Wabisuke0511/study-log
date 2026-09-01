@@ -540,12 +540,53 @@
     .cal-cell.sat  .cal-day { color: #1c7ed6; }
     .cal-cell.today .cal-day { color: var(--primary); font-weight: 800; }
     .cal-events { flex: 1; display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
+    .cal-event {
+      font-size: 9px; font-weight: 700; line-height: 1.3;
+      border-radius: 3px; padding: 1px 2px; text-align: center;
+      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    }
+    .cal-event.kumiwake { background: var(--c-total); color: #fff; }
+    .cal-cell.has-event { background: #f6ecfb; }
+    .cal-cell.has-event.selected { background: #e3f0ff; }
 
     .cal-detail {
       margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border);
     }
     .cal-detail-date { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
     .cal-detail-empty { font-size: 13px; color: var(--text-secondary); }
+    .cal-detail-event {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; border-radius: var(--radius-sm);
+      background: var(--input-bg); margin-bottom: 6px;
+    }
+    .cal-detail-event .dot {
+      flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--c-total);
+    }
+    .cal-detail-event .name { font-size: 14px; font-weight: 700; }
+
+    /* 日程一覧（カレンダー下） */
+    .cal-list { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .cal-list-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+    .cal-list-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 10px; border-radius: var(--radius-sm);
+      background: var(--input-bg); margin-bottom: 6px;
+      cursor: pointer; border: 1.5px solid transparent;
+    }
+    .cal-list-item.past { opacity: 0.45; }
+    .cal-list-item.next { border-color: var(--c-total); background: #f6ecfb; }
+    .cal-list-round {
+      flex-shrink: 0; min-width: 46px; text-align: center;
+      font-size: 12px; font-weight: 700; color: #fff;
+      background: var(--c-total); border-radius: 4px; padding: 3px 4px;
+    }
+    .cal-list-date { font-size: 14px; font-weight: 600; }
+    .cal-list-badge {
+      margin-left: auto; flex-shrink: 0;
+      font-size: 11px; font-weight: 700; color: var(--c-total);
+    }
+    .cal-list-item.past .cal-list-badge { color: var(--text-secondary); }
     .cal-range-note {
       font-size: 12px; color: var(--text-secondary); margin-top: 12px; text-align: center;
     }
@@ -927,6 +968,7 @@
       <div class="cal-grid" id="calGrid"></div>
 
       <div class="cal-detail" id="calDetail"></div>
+      <div class="cal-list" id="calList"></div>
       <div class="cal-range-note" id="calRangeNote"></div>
     </div>
   </div>
@@ -1159,13 +1201,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.10';
+const APP_VERSION = 'v2.11';
 const BUILD_TIME  = '202609011200';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.11', date: '2026-09-01', tags: ['feat'],
+    changes: [
+      '組分けテストの日程をカレンダーに登録（第6回〜第9回）',
+      'テストのある日は色を変えて回数バッジを表示。タップで詳細を確認できる',
+      'カレンダー下に「テスト日程一覧」を追加。次のテストまでの残り日数を表示し、タップでその日へ移動',
+    ]
+  },
   {
     version: 'v2.10', date: '2026-09-01', tags: ['feat'],
     changes: [
@@ -2926,6 +2976,26 @@ const CAL_START_DATE = '2026-09-01';
 const CAL_END_DATE   = '2029-03-31';
 const CAL_DOW = ['日','月','火','水','木','金','土'];
 
+// -----------------------------------------------------
+//  テスト日程マスタ
+// -----------------------------------------------------
+// kind は CSS のクラス名と色分けに対応（今は組分けのみ）
+// 日程が発表されたらここに追記するだけでカレンダー・一覧の両方に反映される
+const CAL_EVENTS = [
+  { date: '2026-10-04', kind: 'kumiwake', name: '組分けテスト', round: '第6回' },
+  { date: '2026-11-08', kind: 'kumiwake', name: '組分けテスト', round: '第7回' },
+  { date: '2026-12-13', kind: 'kumiwake', name: '組分けテスト', round: '第8回' },
+  { date: '2027-01-24', kind: 'kumiwake', name: '組分けテスト', round: '第9回' },
+].sort((a, b) => a.date.localeCompare(b.date));
+
+// 日付 → イベント配列（同じ日に複数入っても表示できるようにしておく）
+const CAL_EVENTS_BY_DATE = CAL_EVENTS.reduce((map, ev) => {
+  (map[ev.date] = map[ev.date] || []).push(ev);
+  return map;
+}, {});
+
+function getCalEvents(ds) { return CAL_EVENTS_BY_DATE[ds] || []; }
+
 // 表示中の月と選択中の日付
 let calYear  = CAL_START.y;
 let calMonth = CAL_START.m;
@@ -3020,15 +3090,20 @@ function renderCalendar() {
       html += `<div class="cal-cell out-of-range"><div class="cal-day">${d}</div></div>`;
       continue;
     }
+    const events = getCalEvents(ds);
     const cls = [
       'cal-cell',
       dow === 0 ? 'sun' : dow === 6 ? 'sat' : '',
       ds === today ? 'today' : '',
+      events.length ? 'has-event' : '',
       ds === calSelectedDate ? 'selected' : '',
     ].filter(Boolean).join(' ');
+    const chips = events.map(ev =>
+      `<div class="cal-event ${ev.kind}">${ev.round}</div>`
+    ).join('');
     html += `<div class="${cls}" data-date="${ds}" onclick="selectCalDate('${ds}')">
       <div class="cal-day">${d}</div>
-      <div class="cal-events" id="calEvents-${ds}"></div>
+      <div class="cal-events" id="calEvents-${ds}">${chips}</div>
     </div>`;
   }
 
@@ -3040,17 +3115,75 @@ function renderCalendar() {
 
   const detail = document.getElementById('calDetail');
   if (calSelectedDate) {
+    const events = getCalEvents(calSelectedDate);
+    const body = events.length
+      ? events.map(ev => `
+          <div class="cal-detail-event">
+            <span class="dot"></span>
+            <span class="name">${ev.name}　${ev.round}</span>
+          </div>`).join('')
+      : '<div class="cal-detail-empty">この日の予定はありません。</div>';
     detail.innerHTML = `
       <div class="cal-detail-date">${calSelectedDate.split('-')[0]}年${formatDate(calSelectedDate)}</div>
-      <div class="cal-detail-empty">この日の予定はまだ登録されていません。</div>`;
+      ${body}`;
     detail.style.display = 'block';
   } else {
     detail.innerHTML = '';
     detail.style.display = 'none';
   }
 
+  renderCalList();
+
   document.getElementById('calRangeNote').textContent =
     `表示できる期間：${CAL_START.y}年${CAL_START.m}月 〜 ${CAL_END.y}年${CAL_END.m}月`;
+}
+
+// 一覧の行をタップしたら、その月へ移動してその日を選択する
+function jumpToCalDate(ds) {
+  if (!isInCalRange(ds)) return;
+  const [y, m] = ds.split('-').map(Number);
+  calYear = y; calMonth = m; calSelectedDate = ds;
+  renderCalendar();
+}
+
+// カレンダー下の日程一覧。まだ来ていない最初の1件を「次」として強調する
+function renderCalList() {
+  const list = document.getElementById('calList');
+  const upcoming = CAL_EVENTS.filter(ev => isInCalRange(ev.date));
+  if (!upcoming.length) {
+    list.innerHTML = '';
+    list.style.display = 'none';
+    return;
+  }
+
+  const today   = todayString();
+  const nextDate = upcoming.find(ev => ev.date >= today)?.date ?? null;
+
+  list.innerHTML = `
+    <div class="cal-list-title">📋 テスト日程一覧</div>
+    ${upcoming.map(ev => {
+      const past = ev.date < today;
+      const isNext = ev.date === nextDate;
+      const left  = daysUntil(today, ev.date);
+      const badge = past ? '終了'
+        : isNext ? (left === 0 ? '今日' : `あと${left}日`)
+        : '';
+      return `
+        <div class="cal-list-item ${past ? 'past' : ''} ${isNext ? 'next' : ''}"
+             onclick="jumpToCalDate('${ev.date}')">
+          <span class="cal-list-round">${ev.round}</span>
+          <span class="cal-list-date">${ev.date.split('-')[0]}年${formatDate(ev.date)}</span>
+          ${badge ? `<span class="cal-list-badge">${badge}</span>` : ''}
+        </div>`;
+    }).join('')}`;
+  list.style.display = 'block';
+}
+
+// from から to までの日数。どちらも 'YYYY-MM-DD'（同日なら0）
+function daysUntil(from, to) {
+  const a = new Date(from + 'T00:00:00');
+  const b = new Date(to   + 'T00:00:00');
+  return Math.round((b - a) / 86400000);
 }
 
 // =====================================================
