@@ -1,0 +1,1027 @@
+<title>学習記録アプリ 設計書</title>
+<style>
+  :root {
+    --bg:         #f4f6fb;
+    --surface:    #ffffff;
+    --surface2:   #eef1f9;
+    --accent:     #3b5bdb;
+    --accent-dim: #748ffc;
+    --ink:        #1e3a5f;
+    --ink2:       #475569;
+    --ink3:       #94a3b8;
+    --border:     #dde3f0;
+    --code-bg:    #f1f4fb;
+    --green:      #2f9e44;
+    --orange:     #e67700;
+    --red:        #c92a2a;
+    --purple:     #6741d9;
+    --tag-bg:     #e8edff;
+    --tag-fg:     #3b5bdb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:         #0d1421;
+      --surface:    #162035;
+      --surface2:   #1c2a42;
+      --accent:     #748ffc;
+      --accent-dim: #3b5bdb;
+      --ink:        #e2e8f5;
+      --ink2:       #94a3b8;
+      --ink3:       #475569;
+      --border:     #253349;
+      --code-bg:    #1a2a40;
+      --green:      #51cf66;
+      --orange:     #ffa94d;
+      --red:        #ff6b6b;
+      --purple:     #b197fc;
+      --tag-bg:     #1e2d55;
+      --tag-fg:     #748ffc;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f6fb; --surface: #ffffff; --surface2: #eef1f9;
+    --accent: #3b5bdb; --accent-dim: #748ffc;
+    --ink: #1e3a5f; --ink2: #475569; --ink3: #94a3b8;
+    --border: #dde3f0; --code-bg: #f1f4fb;
+    --green: #2f9e44; --orange: #e67700; --red: #c92a2a; --purple: #6741d9;
+    --tag-bg: #e8edff; --tag-fg: #3b5bdb;
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1421; --surface: #162035; --surface2: #1c2a42;
+    --accent: #748ffc; --accent-dim: #3b5bdb;
+    --ink: #e2e8f5; --ink2: #94a3b8; --ink3: #475569;
+    --border: #253349; --code-bg: #1a2a40;
+    --green: #51cf66; --orange: #ffa94d; --red: #ff6b6b; --purple: #b197fc;
+    --tag-bg: #1e2d55; --tag-fg: #748ffc;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.75;
+    padding: 40px 20px 80px;
+  }
+
+  .doc {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  /* ── Cover ── */
+  .cover {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 40px 48px 36px;
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 5px;
+    background: var(--accent);
+    border-radius: 12px 0 0 12px;
+  }
+  .cover-eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+  .cover-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.25;
+    text-wrap: balance;
+    margin-bottom: 10px;
+  }
+  .cover-sub {
+    font-size: 14px;
+    color: var(--ink2);
+    margin-bottom: 24px;
+  }
+  .cover-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--tag-bg);
+    color: var(--tag-fg);
+  }
+  .chip-green { background: #ecfdf3; color: var(--green); }
+  .chip-orange { background: #fff4e0; color: var(--orange); }
+  .chip-purple { background: #f3eeff; color: var(--purple); }
+  @media (prefers-color-scheme: dark) {
+    .chip-green { background: #1a3d27; }
+    .chip-orange { background: #3b2600; }
+    .chip-purple { background: #2a1d4a; }
+  }
+  :root[data-theme="dark"] .chip-green { background: #1a3d27; }
+  :root[data-theme="dark"] .chip-orange { background: #3b2600; }
+  :root[data-theme="dark"] .chip-purple { background: #2a1d4a; }
+  :root[data-theme="light"] .chip-green { background: #ecfdf3; }
+  :root[data-theme="light"] .chip-orange { background: #fff4e0; }
+  :root[data-theme="light"] .chip-purple { background: #f3eeff; }
+
+  /* ── Sections ── */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 40px;
+    margin-bottom: 24px;
+  }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-num {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .section-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+
+  h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 24px 0 10px;
+  }
+  h3:first-child { margin-top: 0; }
+
+  p { color: var(--ink2); margin-bottom: 10px; }
+  p:last-child { margin-bottom: 0; }
+
+  /* ── Stack / two-col layouts ── */
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    margin-bottom: 10px;
+  }
+  .card-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--ink);
+  }
+  .card-list {
+    list-style: none;
+    font-size: 13px;
+    color: var(--ink2);
+  }
+  .card-list li {
+    padding: 5px 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .card-list li:last-child { border-bottom: none; }
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+    margin-top: 6px;
+  }
+  .dot-green { background: var(--green); }
+  .dot-orange { background: var(--orange); }
+  .dot-purple { background: var(--purple); }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; margin: 14px 0; border-radius: 8px; border: 1px solid var(--border); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  thead tr { background: var(--surface2); }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 14px;
+    color: var(--ink2);
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: var(--surface2); }
+  .td-key {
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .td-type {
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+    font-size: 11px;
+    color: var(--orange);
+    white-space: nowrap;
+  }
+
+  /* ── Code ── */
+  pre, code {
+    font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 12px;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    line-height: 1.6;
+    color: var(--ink2);
+    margin: 14px 0;
+  }
+  code {
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  /* ── Arch diagram ── */
+  .arch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    align-items: stretch;
+    margin: 16px 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .arch-layer {
+    flex: 1;
+    min-width: 140px;
+    padding: 18px 16px;
+    border-right: 1px solid var(--border);
+    text-align: center;
+  }
+  .arch-layer:last-child { border-right: none; }
+  .arch-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink3);
+    margin-bottom: 10px;
+  }
+  .arch-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 6px;
+  }
+  .arch-box.accent { border-color: var(--accent); color: var(--accent); background: var(--tag-bg); }
+  .arch-box.green  { border-color: var(--green);  color: var(--green);  background: #ecfdf3; }
+  .arch-box.orange { border-color: var(--orange); color: var(--orange); background: #fff4e0; }
+  @media (prefers-color-scheme: dark) {
+    .arch-box.green  { background: #1a3d27; }
+    .arch-box.orange { background: #3b2600; }
+  }
+  :root[data-theme="dark"] .arch-box.green  { background: #1a3d27; }
+  :root[data-theme="dark"] .arch-box.orange { background: #3b2600; }
+
+  /* ── Tab diagram ── */
+  .tab-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 14px 0;
+  }
+  @media (max-width: 580px) { .tab-grid { grid-template-columns: 1fr 1fr; } }
+  .tab-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 14px;
+  }
+  .tab-icon { font-size: 22px; margin-bottom: 8px; }
+  .tab-name { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+  .tab-feat { font-size: 11px; color: var(--ink2); line-height: 1.7; }
+
+  /* ── Flow ── */
+  .flow {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 14px 0;
+    font-size: 12px;
+    color: var(--ink2);
+  }
+  .flow-step {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .flow-arrow { color: var(--ink3); font-size: 14px; }
+
+  /* ── Legend row ── */
+  .legend-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 10px 0;
+    font-size: 12px;
+    color: var(--ink2);
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-swatch {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 20px 0;
+  }
+
+  /* ── Note/Warning boxes ── */
+  .note {
+    border-left: 3px solid var(--accent);
+    background: var(--tag-bg);
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--ink2);
+    margin: 14px 0;
+  }
+  .note strong { color: var(--ink); }
+  .warn {
+    border-left: 3px solid var(--red);
+    background: #fff1f1;
+    border-radius: 0 8px 8px 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--red);
+    margin: 14px 0;
+  }
+  @media (prefers-color-scheme: dark) {
+    .warn { background: #3d1515; }
+  }
+  :root[data-theme="dark"] .warn { background: #3d1515; }
+
+  /* ── History timeline ── */
+  .timeline { margin: 14px 0; }
+  .tl-item {
+    display: flex;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .tl-item:last-child { border-bottom: none; }
+  .tl-tag {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    align-self: flex-start;
+    margin-top: 1px;
+  }
+  .tl-tag-feat { background: var(--tag-bg); color: var(--tag-fg); }
+  .tl-tag-fix  { background: #ecfdf3; color: var(--green); }
+  .tl-tag-db   { background: #fff4e0; color: var(--orange); }
+  .tl-tag-ai   { background: #f3eeff; color: var(--purple); }
+  @media (prefers-color-scheme: dark) {
+    .tl-tag-fix { background: #1a3d27; }
+    .tl-tag-db  { background: #3b2600; }
+    .tl-tag-ai  { background: #2a1d4a; }
+  }
+  :root[data-theme="dark"] .tl-tag-fix { background: #1a3d27; }
+  :root[data-theme="dark"] .tl-tag-db  { background: #3b2600; }
+  :root[data-theme="dark"] .tl-tag-ai  { background: #2a1d4a; }
+  .tl-body { color: var(--ink2); line-height: 1.6; }
+  .tl-body strong { color: var(--ink); }
+</style>
+
+<div class="doc">
+
+  <!-- Cover -->
+  <div class="cover">
+    <div class="cover-eyebrow">設計書 / Design Specification</div>
+    <div class="cover-title">📚 学習記録アプリ</div>
+    <div class="cover-sub">早稲アカ 中学受験生向け 勉強時間・テスト成績管理 PWA</div>
+    <div class="cover-meta">
+      <span class="chip">Single-file PWA</span>
+      <span class="chip">GitHub Pages</span>
+      <span class="chip chip-green">Supabase</span>
+      <span class="chip chip-orange">Chart.js v4</span>
+      <span class="chip chip-purple">Claude AI Vision</span>
+      <span class="chip">2514 行 / 1 HTML</span>
+    </div>
+  </div>
+
+  <!-- 1. アーキテクチャ -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <span class="section-title">アーキテクチャ概要</span>
+    </div>
+
+    <div class="arch">
+      <div class="arch-layer">
+        <div class="arch-label">Frontend</div>
+        <div class="arch-box accent">index.html</div>
+        <div class="arch-box">manifest.json</div>
+        <div class="arch-box">sw.js</div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">Hosting</div>
+        <div class="arch-box green">GitHub Pages</div>
+        <div class="arch-box">wabisuke0511.github.io /study-log/</div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">Supabase DB</div>
+        <div class="arch-box green">study_records</div>
+        <div class="arch-box green">study_test_entries</div>
+        <div class="arch-box green">study_target_schools</div>
+        <div class="arch-box green">study_deviation_masters</div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">Edge Functions</div>
+        <div class="arch-box orange">school-deviation</div>
+        <div class="arch-box orange">extract-deviation</div>
+      </div>
+      <div class="arch-layer">
+        <div class="arch-label">External</div>
+        <div class="arch-box">四谷大塚ドットコム</div>
+        <div class="arch-box accent">Claude Haiku API (Vision)</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">技術スタック</div>
+        <ul class="card-list">
+          <li><span class="dot"></span><div>Vanilla JS（フレームワークなし）</div></li>
+          <li><span class="dot dot-green"></span><div>Supabase JS Client v2（CDN）</div></li>
+          <li><span class="dot dot-orange"></span><div>Chart.js v4.4.4（CDN）</div></li>
+          <li><span class="dot dot-purple"></span><div>Deno（Edge Function ランタイム）</div></li>
+          <li><span class="dot"></span><div>Service Worker（オフライン対応）</div></li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">ストレージ設計方針</div>
+        <ul class="card-list">
+          <li><span class="dot dot-green"></span><div><strong>Supabase = Primary</strong>（正）全データはここが Source of Truth</div></li>
+          <li><span class="dot dot-orange"></span><div><strong>localStorage = Cache</strong>（副）起動高速化と offline 用途のみ</div></li>
+          <li><span class="dot"></span><div>起動時 + <code>visibilitychange</code> 時に <code>pullFromSupabase()</code> でマージ</div></li>
+          <li><span class="dot"></span><div>偏差値マスタはメモリキャッシュ <code>_dmCache</code>（localStorage不使用）</div></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>マルチデバイス同期の仕組み：</strong> 各デバイスで入力 → Supabase へ即座に delete/insert で全件同期。別デバイスでアプリを開いたり再フォーカスすると <code>pullFromSupabase()</code> が走り、Supabase を正として localStorage を上書きマージする。
+    </div>
+  </div>
+
+  <!-- 2. 画面設計 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <span class="section-title">画面設計（4タブ構成）</span>
+    </div>
+
+    <div class="tab-grid">
+      <div class="tab-card">
+        <div class="tab-icon">⏱</div>
+        <div class="tab-name">勉強時間</div>
+        <div class="tab-feat">
+          日付・教科・分数・内容を記録<br>
+          日ごと/すべて切り替え<br>
+          前後ナビ + 今日ボタン<br>
+          ✏️ 編集 / 🗑 削除<br>
+          「その他」カスタム教科
+        </div>
+      </div>
+      <div class="tab-card">
+        <div class="tab-icon">📝</div>
+        <div class="tab-name">テスト</div>
+        <div class="tab-feat">
+          学年・第N回・年度・実施日<br>
+          一括入力 / 個別入力 切替<br>
+          点数・偏差値・平均点/教科<br>
+          解き直し済みチェック＋日付<br>
+          総合偏差値・合計点自動計算<br>
+          偏差値マスタ連動で自動入力
+        </div>
+      </div>
+      <div class="tab-card">
+        <div class="tab-icon">📊</div>
+        <div class="tab-name">グラフ</div>
+        <div class="tab-feat">
+          KPIタイル（テスト件数/勉強時間）<br>
+          総合偏差値推移（棒+参照線）<br>
+          科目別偏差値グラフ×4<br>
+          解き直し進捗（ドーナツ+棒）<br>
+          勉強時間推移（積み上げ棒）<br>
+          早稲アカSS(56)参照ライン
+        </div>
+      </div>
+      <div class="tab-card">
+        <div class="tab-icon">⚙️</div>
+        <div class="tab-name">設定</div>
+        <div class="tab-feat">
+          志望校マスタ（C50/A80偏差値）<br>
+          四谷大塚から偏差値自動取得<br>
+          偏差値マスタ登録<br>
+          画像アップ / カメラ撮影<br>
+          Claude Vision でAI解析<br>
+          Supabase に upsert 保存
+        </div>
+      </div>
+    </div>
+
+    <h3>子どもの名前によるデータ分離</h3>
+    <p>アプリ初回起動時に名前入力モーダルが表示される。名前は <code>localStorage('childName')</code> に保存され、Supabase の全テーブルで <code>child_name</code> カラムによるフィルタキーとして使用する。複数の子どもへの対応は名前の切り替えで実現。</p>
+  </div>
+
+  <!-- 3. データモデル -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <span class="section-title">データモデル</span>
+    </div>
+
+    <h3>① 勉強時間レコード（study_records）</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>フィールド</th><th>型</th><th>説明</th></tr></thead>
+        <tbody>
+          <tr><td class="td-key">id</td><td class="td-type">bigint PK</td><td><code>Date.now()</code> で生成した Unix timestamp</td></tr>
+          <tr><td class="td-key">child_name</td><td class="td-type">text</td><td>子どもの名前（パーティションキー）</td></tr>
+          <tr><td class="td-key">date</td><td class="td-type">text</td><td>YYYY-MM-DD</td></tr>
+          <tr><td class="td-key">subject</td><td class="td-type">text</td><td>国語 / 算数 / 理科 / 社会 / その他（自由入力）</td></tr>
+          <tr><td class="td-key">minutes</td><td class="td-type">integer</td><td>勉強した分数（1〜999）</td></tr>
+          <tr><td class="td-key">content</td><td class="td-type">text?</td><td>学習内容メモ（任意、最大100文字）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>② テスト記録（study_test_entries）</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>フィールド</th><th>型</th><th>説明</th></tr></thead>
+        <tbody>
+          <tr><td class="td-key">id</td><td class="td-type">bigint PK</td><td><code>Date.now()</code></td></tr>
+          <tr><td class="td-key">child_name</td><td class="td-type">text</td><td>パーティションキー</td></tr>
+          <tr><td class="td-key">grade</td><td class="td-type">text?</td><td>小3〜小6 / 中1〜中3</td></tr>
+          <tr><td class="td-key">round</td><td class="td-type">text?</td><td>第1回〜第9回</td></tr>
+          <tr><td class="td-key">year</td><td class="td-type">text?</td><td>出題年度（西暦4桁）</td></tr>
+          <tr><td class="td-key">date</td><td class="td-type">text</td><td>実施日 YYYY-MM-DD</td></tr>
+          <tr><td class="td-key">subjects</td><td class="td-type">jsonb</td><td>教科別データ（下記参照）</td></tr>
+          <tr><td class="td-key">total_deviation</td><td class="td-type">numeric?</td><td>総合偏差値（手動 or 自動計算）</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <pre>{
+  "kokugo": { "score": 85, "deviation": 58.2, "average": 72.5, "reviewed": true, "reviewDate": "2024-11-10" },
+  "sansu":  { "score": 92, "deviation": 61.0, "average": 68.0, "reviewed": false, "reviewDate": null },
+  "rika":   { ... },
+  "shakai": { ... }
+}</pre>
+
+    <h3>③ 志望校マスタ（study_target_schools）</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>フィールド</th><th>型</th><th>説明</th></tr></thead>
+        <tbody>
+          <tr><td class="td-key">id</td><td class="td-type">bigint PK</td><td></td></tr>
+          <tr><td class="td-key">child_name</td><td class="td-type">text</td><td></td></tr>
+          <tr><td class="td-key">name</td><td class="td-type">text</td><td>学校名（入試区分付き可）</td></tr>
+          <tr><td class="td-key">target_deviation_from</td><td class="td-type">numeric</td><td>C50ライン（合格率50%）</td></tr>
+          <tr><td class="td-key">target_deviation_to</td><td class="td-type">numeric</td><td>A80ライン（合格率80%）</td></tr>
+          <tr><td class="td-key">target_deviation</td><td class="td-type">numeric</td><td>レガシーフィールド（後方互換）</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>④ 偏差値換算マスタ（study_deviation_masters）</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>フィールド</th><th>型</th><th>説明</th></tr></thead>
+        <tbody>
+          <tr><td class="td-key">id</td><td class="td-type">text PK</td><td><code>"小4-第4回-2024"</code> 形式の複合キー</td></tr>
+          <tr><td class="td-key">grade</td><td class="td-type">text</td><td>小4 / 小5 / 小6</td></tr>
+          <tr><td class="td-key">round</td><td class="td-type">text</td><td>第1回〜第9回</td></tr>
+          <tr><td class="td-key">year</td><td class="td-type">text</td><td>西暦4桁</td></tr>
+          <tr><td class="td-key">averages</td><td class="td-type">jsonb</td><td>各教科の平均点 <code>{sansu, kokugo, rika, shakai, total2, total3, total4}</code></td></tr>
+          <tr><td class="td-key">rows</td><td class="td-type">jsonb[]</td><td>偏差値→スコア範囲の変換テーブル（下記参照）</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <pre>[
+  { "dev": 75, "sansu": [196, 200], "kokugo": [143, 148], "rika": null, "shakai": null, "total2": null, "total3": null, "total4": null },
+  { "dev": 74, "sansu": [190, 195], "kokugo": [139, 142], ... },
+  ...
+]</pre>
+    <div class="note">
+      <strong>行は偏差値の降順（75→74→…→30）で格納。</strong> スコア逆引きは rows を上から線形探索し、スコアが range[0]〜range[1] に収まる最初の dev を返す。
+    </div>
+  </div>
+
+  <!-- 4. Supabase同期設計 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">04</span>
+      <span class="section-title">Supabase同期設計</span>
+    </div>
+
+    <h3>書き込み（Push）パターン</h3>
+    <p>ローカルで CRUD 操作後、<strong>全件 delete → 全件 insert</strong> で Supabase を上書きする。楽観的ロックなし。同時書き込みは想定しない（1家庭1子ども想定）。</p>
+    <div class="flow">
+      <div class="flow-step">ユーザー操作</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">localStorage 更新</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">syncXxx() 呼び出し</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">DELETE WHERE child_name=n</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">INSERT 全件</div>
+    </div>
+
+    <h3>読み込み（Pull）パターン — <code>pullFromSupabase()</code></h3>
+    <p>起動時と画面フォーカス復帰時に呼ばれる。Supabase を正として localStorage にマージする。</p>
+    <div class="flow">
+      <div class="flow-step">Supabase から全件取得</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Map(id → record) でローカルと差分比較</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">新規 or 差分があれば localStorage 上書き</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">render再実行</div>
+    </div>
+    <div class="note">
+      テスト記録の pull では <code>subjects</code>（解き直し含む）と <code>totalDeviation</code> を Supabase の値で上書きする。これによりデバイス間の解き直しチェックが同期される。
+    </div>
+
+    <h3>フィールド変換関数</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>関数</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td class="td-key">toStudyRow(r, n)</td><td>JS オブジェクト → Supabase 行（snake_case）</td></tr>
+          <tr><td class="td-key">fromStudyRow(r)</td><td>Supabase 行 → JS オブジェクト（camelCase）</td></tr>
+          <tr><td class="td-key">toTestRow(e, n)</td><td>テストエントリ → Supabase 行</td></tr>
+          <tr><td class="td-key">fromTestRow(r)</td><td>Supabase 行 → テストエントリ</td></tr>
+          <tr><td class="td-key">toSchoolRow(s, n)</td><td>志望校 → Supabase 行（C50/A80 両フィールド書き込み）</td></tr>
+          <tr><td class="td-key">fromSchoolRow(r)</td><td>Supabase 行 → 志望校</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 5. 偏差値マスタ機能 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">05</span>
+      <span class="section-title">偏差値マスタ機能（AI画像解析）</span>
+    </div>
+
+    <h3>登録フロー</h3>
+    <div class="flow">
+      <div class="flow-step">📷 画像選択/撮影</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Base64 変換</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Edge Function 呼び出し</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Claude Haiku Vision で JSON 抽出</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">sanitize（単調性検証）</div>
+      <span class="flow-arrow">→</span>
+      <div class="flow-step">Supabase upsert</div>
+    </div>
+
+    <h3>Edge Function: extract-deviation</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>項目</th><th>値</th></tr></thead>
+        <tbody>
+          <tr><td>モデル</td><td><code>claude-haiku-4-5-20251001</code></td></tr>
+          <tr><td>max_tokens</td><td>8192（換算表全行を収めるために拡大）</td></tr>
+          <tr><td>入力</td><td><code>imageBase64</code>（multipart不要、JSON body）</td></tr>
+          <tr><td>出力</td><td><code>{ grade, round, year, averages, rows }</code></td></tr>
+          <tr><td>JSON修復</td><td>括弧数カウントで不完全な末尾を自動補完</td></tr>
+          <tr><td>列順序</td><td>偏差値・算数・国語・理科・社会・2教科計・3教科計・4教科計</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>sanitizeDeviationRows() — 単調性バリデーション</h3>
+    <p>偏差値が高いほどスコアも高いはず、という不変条件を検証する。逆転している値は <code>null</code> に強制してから Supabase に保存する。</p>
+    <pre>// 偏差値降順で走査。各列のスコア最大値が前行より大きければ単調性違反 → null化
+for (const col of ['sansu','kokugo','rika','shakai','total2','total3','total4']) {
+  let prevMin = Infinity;
+  for (const row of cleaned) {         // rows は dev 降順
+    const [mn, mx] = row[col] ?? [null, null];
+    if (mx >= prevMin) row[col] = null; // 逆転
+    else               prevMin = mn;
+  }
+}</pre>
+
+    <h3>偏差値逆引き — <code>lookupDeviation(master, subject, score)</code></h3>
+    <p>スコアから偏差値を求める。rows を上から線形探索して range に収まる最初の dev を返す（O(n)、行数は通常50行程度なので問題なし）。</p>
+
+    <h3>Edge Function: school-deviation</h3>
+    <p>四谷大塚ドットコムから志望校の C50 / A80 偏差値を取得する。学校名をパラメータに渡し、AI が該当データをスクレイピング・パースして返す。</p>
+  </div>
+
+  <!-- 6. グラフ設計 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">06</span>
+      <span class="section-title">グラフ設計（Chart.js v4）</span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>グラフ</th><th>種別</th><th>X軸</th><th>Y軸</th><th>特記</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>総合偏差値推移</td>
+            <td>混合（棒+折れ線）</td>
+            <td>年度（回でフィルタ）</td>
+            <td>偏差値 min:45 max:70</td>
+            <td>志望校C50/A80・早稲アカSS(56)ライン重畳、チェックボックス切替</td>
+          </tr>
+          <tr>
+            <td>科目別偏差値×4</td>
+            <td>棒</td>
+            <td>年度</td>
+            <td>偏差値 min:45 max:70</td>
+            <td>早稲アカSS(56)折れ線を重畳</td>
+          </tr>
+          <tr>
+            <td>解き直し進捗</td>
+            <td>ドーナツ</td>
+            <td>—</td>
+            <td>—</td>
+            <td>cutout 72%、中央に%表示。科目別水平バーと並置</td>
+          </tr>
+          <tr>
+            <td>勉強時間推移</td>
+            <td>積み上げ棒</td>
+            <td>日付</td>
+            <td>分（stepSize:30）</td>
+            <td>教科別色分け、未登録教科は除外</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="legend-row">
+      <div class="legend-item"><div class="legend-swatch" style="background:#ff6b6b"></div>国語</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#4b9eff"></div>算数</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#51cf66"></div>理科</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#ffa94d"></div>社会</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#ae3ec9"></div>総合</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#e67700"></div>早稲アカSS基準(56)</div>
+    </div>
+
+    <div class="note">
+      <strong>A80ラインは初期非表示（<code>hidden: true</code>）。</strong> チェックボックス凡例で切替可。<code>hidden: false</code> を明示するとモバイルで挙動不安定になるため、表示したいものは <code>hidden</code> プロパティを省略する。
+    </div>
+  </div>
+
+  <!-- 7. 主要ロジック -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">07</span>
+      <span class="section-title">主要ロジック・関数一覧</span>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>関数</th><th>タブ</th><th>説明</th></tr></thead>
+        <tbody>
+          <tr><td class="td-key">pullFromSupabase()</td><td>全体</td><td>起動時 / visibilitychange 時に Supabase→localStorage へ差分マージ</td></tr>
+          <tr><td class="td-key">syncStudyRecords()</td><td>勉強時間</td><td>delete→insert で Supabase を上書き</td></tr>
+          <tr><td class="td-key">syncTestEntries()</td><td>テスト</td><td>同上</td></tr>
+          <tr><td class="td-key">syncTargetSchools()</td><td>設定</td><td>同上</td></tr>
+          <tr><td class="td-key">calcTotalScore()</td><td>テスト</td><td>4教科点数を合算して合計点を表示、<code>autoCalcDeviation()</code> を呼ぶ</td></tr>
+          <tr><td class="td-key">autoCalcDeviation()</td><td>テスト</td><td>一括入力時：全教科スコア→偏差値を自動入力、全教科揃えば総合偏差値も</td></tr>
+          <tr><td class="td-key">autoCalcSingleDeviation()</td><td>テスト</td><td>個別入力時：1教科スコア→偏差値を自動入力</td></tr>
+          <tr><td class="td-key">onTestKeyChange()</td><td>テスト</td><td>学年/回/年度が揃ったら平均点を自動入力</td></tr>
+          <tr><td class="td-key">fetchDeviationMasters()</td><td>設定</td><td>Supabase から全マスタを取得し <code>_dmCache</code> を更新</td></tr>
+          <tr><td class="td-key">findDeviationMaster()</td><td>全体</td><td><code>_dmCache</code> から grade/round/year でマスタを返す</td></tr>
+          <tr><td class="td-key">lookupDeviation()</td><td>全体</td><td>スコア→偏差値を rows の線形探索で逆引き</td></tr>
+          <tr><td class="td-key">sanitizeDeviationRows()</td><td>設定</td><td>単調性検証、逆転している範囲を null 化してから保存</td></tr>
+          <tr><td class="td-key">extractDeviationFromImage()</td><td>設定</td><td>Base64 画像を Edge Function に送り AI 解析、結果を表示</td></tr>
+          <tr><td class="td-key">saveDmMaster()</td><td>設定</td><td>sanitize 後 Supabase に upsert、キャッシュと一覧を更新</td></tr>
+          <tr><td class="td-key">fetchDeviationByAI()</td><td>設定</td><td><code>school-deviation</code> Edge Function 経由で四谷大塚の偏差値を取得</td></tr>
+          <tr><td class="td-key">renderDashboard()</td><td>グラフ</td><td>KPI → 偏差値チャート → 科目チャート → 解き直し → 勉強時間 を順次描画</td></tr>
+          <tr><td class="td-key">migrateTestData()</td><td>起動時</td><td>旧形式（1教科1レコード）の遺留データを自動削除</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 8. PWA・インフラ設計 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">08</span>
+      <span class="section-title">PWA・インフラ設計</span>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">iOS ホーム画面追加対応</div>
+        <ul class="card-list">
+          <li><span class="dot"></span><div><code>apple-mobile-web-app-capable</code></div></li>
+          <li><span class="dot"></span><div><code>apple-mobile-web-app-status-bar-style</code></div></li>
+          <li><span class="dot"></span><div><code>safe-area-inset-bottom</code> による padding</div></li>
+          <li><span class="dot dot-green"></span><div>Service Worker でネットワーク優先キャッシュ（古いキャッシュ自動更新）</div></li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">Supabase キー管理</div>
+        <ul class="card-list">
+          <li><span class="dot dot-green"></span><div><strong>anon key（publishable）</strong>のみ使用。HTML に直書きしてよい</div></li>
+          <li><span class="dot" style="background:var(--red)"></span><div><strong>service_role / secret キーは絶対に HTML に書かない</strong></div></li>
+          <li><span class="dot dot-orange"></span><div>Edge Function の ANTHROPIC_API_KEY は Supabase Secret に設定</div></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="warn">
+      <strong>セキュリティ制約：</strong> service_role キーはコード・Git 履歴・公開ファイルに絶対に含めないこと。Edge Function 内でのみ使用し、Supabase Dashboard の Secret として管理する。
+    </div>
+  </div>
+
+  <!-- 9. 開発履歴 -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">09</span>
+      <span class="section-title">主要開発履歴</span>
+    </div>
+
+    <div class="timeline">
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-feat">FEAT</span>
+        <div class="tl-body"><strong>コア機能</strong>：勉強時間記録・テスト記録・グラフタブ・Supabase 同期の基本実装</div>
+      </div>
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-feat">FEAT</span>
+        <div class="tl-body"><strong>志望校マスタ</strong>：C50/A80 偏差値ラインをグラフに重畳。四谷大塚から AI で自動取得</div>
+      </div>
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-feat">FEAT</span>
+        <div class="tl-body"><strong>早稲アカSS参照ライン</strong>：偏差値56の水平線を全グラフに追加</div>
+      </div>
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-ai">AI</span>
+        <div class="tl-body"><strong>偏差値マスタ機能</strong>：換算表の画像をアップ → Claude Haiku Vision で JSON 抽出 → Supabase に保存 → テスト入力時に自動計算</div>
+      </div>
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-fix">FIX</span>
+        <div class="tl-body"><strong>棒グラフ PC/iPhone 表示問題</strong>：<code>hidden: false</code> 明示がモバイルで不具合 → <code>hidden</code> プロパティを省略する方針に統一。<code>totalDeviation=0</code> を null 扱いに修正</div>
+      </div>
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-fix">FIX</span>
+        <div class="tl-body"><strong>クロスデバイス同期</strong>：pull が新規追加のみだったため解き直し・勉強時間修正がiPhoneに反映されなかった → 全フィールドを上書きマージに変更</div>
+      </div>
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-feat">FEAT</span>
+        <div class="tl-body"><strong>第9回対応</strong>：テスト回・偏差値マスタの選択肢に第9回を追加</div>
+      </div>
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-db">DB</span>
+        <div class="tl-body"><strong>偏差値マスタ単調性バリデーション</strong>：AI が total4 列を誤抽出するバグに対応。<code>sanitizeDeviationRows()</code> で逆転値を自動 null 化</div>
+      </div>
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-feat">FEAT</span>
+        <div class="tl-body"><strong>グラフY軸上限70に統一</strong>：全グラフの y-axis を <code>min:45, max:70</code> に固定</div>
+      </div>
+      <div class="tl-item">
+        <span class="tl-tag tl-tag-feat">FEAT</span>
+        <div class="tl-body"><strong>個別入力モードの自動入力</strong>：<code>autoCalcSingleDeviation()</code> を追加し、個別入力でも点数→偏差値・平均点を自動入力</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. 類似アプリ開発ガイド -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">10</span>
+      <span class="section-title">類似アプリを作る際のテンプレート構成</span>
+    </div>
+
+    <h3>再利用できるパターン</h3>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Supabase同期テンプレート</div>
+        <ul class="card-list">
+          <li><span class="dot"></span><div><code>toXxxRow()</code> / <code>fromXxxRow()</code> で変換層を分離</div></li>
+          <li><span class="dot dot-green"></span><div><code>syncXxx()</code>：delete→insert のパターン</div></li>
+          <li><span class="dot dot-orange"></span><div><code>pullFromSupabase()</code>：起動 + visibilitychange</div></li>
+          <li><span class="dot"></span><div><code>showSyncStatus()</code>：ヘッダーに同期状態表示</div></li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="card-title">AI機能テンプレート</div>
+        <ul class="card-list">
+          <li><span class="dot dot-purple"></span><div>画像 → Edge Function → Claude Vision → JSON</div></li>
+          <li><span class="dot dot-purple"></span><div>JSON 修復ロジック（括弧カウント補完）</div></li>
+          <li><span class="dot dot-purple"></span><div>抽出後ハイライト（未検出フィールドに赤枠）</div></li>
+          <li><span class="dot"></span><div>model: <code>claude-haiku-4-5-20251001</code>（高速・低コスト）</div></li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>ファイル構成（最小構成）</h3>
+    <pre>my-tracker/
+├── index.html          # 全ロジック・スタイル・HTML（単一ファイル）
+├── manifest.json       # PWA マニフェスト
+├── sw.js               # Service Worker（network-first）
+└── supabase/
+    └── functions/
+        └── my-function/
+            └── index.ts  # Deno Edge Function</pre>
+
+    <h3>Supabaseテーブル設計のコツ</h3>
+    <ul class="card-list" style="list-style:none;padding:0">
+      <li style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--ink2)"><span class="dot"></span><div><code>child_name</code> / <code>user_id</code> をパーティションキーとして全テーブルに持たせる</div></li>
+      <li style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--ink2)"><span class="dot"></span><div>複雑なネスト構造は <code>jsonb</code> に入れる（RLS の代わりにアプリ側でフィルタ）</div></li>
+      <li style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px;color:var(--ink2)"><span class="dot dot-green"></span><div>複合 PK は <code>id = "キー1-キー2-キー3"</code> の文字列連結で upsert が簡単</div></li>
+      <li style="display:flex;gap:8px;padding:6px 0;font-size:13px;color:var(--ink2)"><span class="dot dot-orange"></span><div>anon key は公開 OK。secret は絶対に Edge Function Secret に格納</div></li>
+    </ul>
+  </div>
+
+</div>
