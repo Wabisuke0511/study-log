@@ -523,7 +523,7 @@
     .cal-dow.sat { color: #1c7ed6; }
 
     .cal-cell {
-      min-height: 54px; border-radius: var(--radius-sm);
+      min-height: 62px; border-radius: var(--radius-sm);
       background: var(--input-bg); padding: 4px 3px 3px;
       display: flex; flex-direction: column; align-items: stretch;
       border: 1.5px solid transparent; cursor: pointer;
@@ -541,12 +541,16 @@
     .cal-cell.today .cal-day { color: var(--primary); font-weight: 800; }
     .cal-events { flex: 1; display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
     .cal-event {
-      font-size: 9px; font-weight: 700; line-height: 1.3;
-      border-radius: 3px; padding: 1px 2px; text-align: center;
-      overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+      display: flex; flex-direction: column; align-items: center;
+      font-weight: 700; line-height: 1.15;
+      border-radius: 3px; padding: 2px 1px; color: #fff;
+      overflow: hidden;
     }
-    .cal-event.kumiwake { background: var(--c-total); color: #fff; }
-    .cal-cell.has-event { background: #f6ecfb; }
+    .cal-event .ev-name  { font-size: 8px; opacity: 0.9; }
+    .cal-event .ev-round { font-size: 9px; white-space: nowrap; }
+    .cal-event.kumiwake   { background: var(--c-total); }
+    .cal-event.curriculum { background: var(--c-shakai); }
+    .cal-cell.has-event { background: #f3eef8; }
     .cal-cell.has-event.selected { background: #e3f0ff; }
 
     .cal-detail {
@@ -559,32 +563,43 @@
       padding: 10px 12px; border-radius: var(--radius-sm);
       background: var(--input-bg); margin-bottom: 6px;
     }
-    .cal-detail-event .dot {
-      flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
-      background: var(--c-total);
-    }
     .cal-detail-event .name { font-size: 14px; font-weight: 700; }
+
+    /* テスト種別の色ドット（詳細・凡例で共用） */
+    .dot {
+      flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block;
+    }
+    .dot.kumiwake   { background: var(--c-total); }
+    .dot.curriculum { background: var(--c-shakai); }
 
     /* 日程一覧（カレンダー下） */
     .cal-list { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
-    .cal-list-title { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+    .cal-list-title { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+    .cal-legend {
+      display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 10px;
+      font-size: 12px; color: var(--text-secondary);
+    }
+    .cal-legend-item { display: flex; align-items: center; gap: 5px; }
     .cal-list-item {
       display: flex; align-items: center; gap: 10px;
-      padding: 9px 10px; border-radius: var(--radius-sm);
+      padding: 8px 10px 8px 12px; border-radius: var(--radius-sm);
       background: var(--input-bg); margin-bottom: 6px;
       cursor: pointer; border: 1.5px solid transparent;
+      border-left: 4px solid var(--text-secondary);
     }
+    .cal-list-item.kumiwake   { border-left-color: var(--c-total); }
+    .cal-list-item.curriculum { border-left-color: var(--c-shakai); }
     .cal-list-item.past { opacity: 0.45; }
-    .cal-list-item.next { border-color: var(--c-total); background: #f6ecfb; }
-    .cal-list-round {
-      flex-shrink: 0; min-width: 46px; text-align: center;
-      font-size: 12px; font-weight: 700; color: #fff;
-      background: var(--c-total); border-radius: 4px; padding: 3px 4px;
-    }
-    .cal-list-date { font-size: 14px; font-weight: 600; }
+    .cal-list-item.next { border-color: var(--primary); background: #eef5ff; }
+    .cal-list-item.next.kumiwake   { border-left-color: var(--c-total); }
+    .cal-list-item.next.curriculum { border-left-color: var(--c-shakai); }
+    .cal-list-body { min-width: 0; }
+    .cal-list-date  { font-size: 12px; color: var(--text-secondary); }
+    .cal-list-label { font-size: 14px; font-weight: 700; margin-top: 1px; }
     .cal-list-badge {
       margin-left: auto; flex-shrink: 0;
-      font-size: 11px; font-weight: 700; color: var(--c-total);
+      font-size: 11px; font-weight: 700; color: var(--primary);
     }
     .cal-list-item.past .cal-list-badge { color: var(--text-secondary); }
     .cal-range-note {
@@ -1201,13 +1216,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.11';
+const APP_VERSION = 'v2.12';
 const BUILD_TIME  = '202609011200';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.12', date: '2026-09-01', tags: ['feat'],
+    changes: [
+      'カリキュラムテストの日程を追加（9/12〜1/16の全7回）。組分けテストと色分けして表示',
+      'テスト名を「第6回組分けテスト」のように正式名称で表示するように変更（詳細・一覧）',
+      'カレンダーのセルは種別の略称＋回数を2行で表示。色の意味は一覧上部の凡例で確認できる',
+    ]
+  },
   {
     version: 'v2.11', date: '2026-09-01', tags: ['feat'],
     changes: [
@@ -2979,14 +3002,32 @@ const CAL_DOW = ['日','月','火','水','木','金','土'];
 // -----------------------------------------------------
 //  テスト日程マスタ
 // -----------------------------------------------------
-// kind は CSS のクラス名と色分けに対応（今は組分けのみ）
-// 日程が発表されたらここに追記するだけでカレンダー・一覧の両方に反映される
+// kind は色分け（CSSクラス）と略称に対応する
+const CAL_KINDS = {
+  kumiwake:   { name: '組分けテスト',     short: '組分け' },
+  curriculum: { name: 'カリキュラムテスト', short: 'カリ'   },
+};
+
+// 日程が発表されたらここに追記するだけでカレンダー・詳細・一覧すべてに反映される
+// round は各テストの回数表記（組分け＝第1〜9回、カリキュラム＝予習シリーズの範囲）
 const CAL_EVENTS = [
-  { date: '2026-10-04', kind: 'kumiwake', name: '組分けテスト', round: '第6回' },
-  { date: '2026-11-08', kind: 'kumiwake', name: '組分けテスト', round: '第7回' },
-  { date: '2026-12-13', kind: 'kumiwake', name: '組分けテスト', round: '第8回' },
-  { date: '2027-01-24', kind: 'kumiwake', name: '組分けテスト', round: '第9回' },
-].sort((a, b) => a.date.localeCompare(b.date));
+  { date: '2026-09-12', kind: 'curriculum', round: '第1-2回'   },
+  { date: '2026-09-26', kind: 'curriculum', round: '第3-4回'   },
+  { date: '2026-10-04', kind: 'kumiwake',   round: '第6回'     },
+  { date: '2026-10-17', kind: 'curriculum', round: '第6-7回'   },
+  { date: '2026-10-31', kind: 'curriculum', round: '第8-9回'   },
+  { date: '2026-11-08', kind: 'kumiwake',   round: '第7回'     },
+  { date: '2026-11-21', kind: 'curriculum', round: '第11-12回' },
+  { date: '2026-12-05', kind: 'curriculum', round: '第13-14回' },
+  { date: '2026-12-13', kind: 'kumiwake',   round: '第8回'     },
+  { date: '2027-01-16', kind: 'curriculum', round: '第16-18回' },
+  { date: '2027-01-24', kind: 'kumiwake',   round: '第9回'     },
+].map(ev => ({
+  ...ev,
+  name:  CAL_KINDS[ev.kind].name,
+  short: CAL_KINDS[ev.kind].short,
+  label: `${ev.round}${CAL_KINDS[ev.kind].name}`,   // 例：第6回組分けテスト
+})).sort((a, b) => a.date.localeCompare(b.date));
 
 // 日付 → イベント配列（同じ日に複数入っても表示できるようにしておく）
 const CAL_EVENTS_BY_DATE = CAL_EVENTS.reduce((map, ev) => {
@@ -3098,8 +3139,12 @@ function renderCalendar() {
       events.length ? 'has-event' : '',
       ds === calSelectedDate ? 'selected' : '',
     ].filter(Boolean).join(' ');
+    // セルは狭いので略称＋回数の2行。正式名称は詳細と一覧に出す
     const chips = events.map(ev =>
-      `<div class="cal-event ${ev.kind}">${ev.round}</div>`
+      `<div class="cal-event ${ev.kind}" title="${ev.label}">
+         <span class="ev-name">${ev.short}</span>
+         <span class="ev-round">${ev.round}</span>
+       </div>`
     ).join('');
     html += `<div class="${cls}" data-date="${ds}" onclick="selectCalDate('${ds}')">
       <div class="cal-day">${d}</div>
@@ -3119,8 +3164,8 @@ function renderCalendar() {
     const body = events.length
       ? events.map(ev => `
           <div class="cal-detail-event">
-            <span class="dot"></span>
-            <span class="name">${ev.name}　${ev.round}</span>
+            <span class="dot ${ev.kind}"></span>
+            <span class="name">${ev.label}</span>
           </div>`).join('')
       : '<div class="cal-detail-empty">この日の予定はありません。</div>';
     detail.innerHTML = `
@@ -3161,6 +3206,11 @@ function renderCalList() {
 
   list.innerHTML = `
     <div class="cal-list-title">📋 テスト日程一覧</div>
+    <div class="cal-legend">
+      ${Object.entries(CAL_KINDS).map(([k, v]) =>
+        `<span class="cal-legend-item"><span class="dot ${k}"></span>${v.name}</span>`
+      ).join('')}
+    </div>
     ${upcoming.map(ev => {
       const past = ev.date < today;
       const isNext = ev.date === nextDate;
@@ -3169,10 +3219,12 @@ function renderCalList() {
         : isNext ? (left === 0 ? '今日' : `あと${left}日`)
         : '';
       return `
-        <div class="cal-list-item ${past ? 'past' : ''} ${isNext ? 'next' : ''}"
+        <div class="cal-list-item ${ev.kind} ${past ? 'past' : ''} ${isNext ? 'next' : ''}"
              onclick="jumpToCalDate('${ev.date}')">
-          <span class="cal-list-round">${ev.round}</span>
-          <span class="cal-list-date">${ev.date.split('-')[0]}年${formatDate(ev.date)}</span>
+          <div class="cal-list-body">
+            <div class="cal-list-date">${ev.date.split('-')[0]}年${formatDate(ev.date)}</div>
+            <div class="cal-list-label">${ev.label}</div>
+          </div>
           ${badge ? `<span class="cal-list-badge">${badge}</span>` : ''}
         </div>`;
     }).join('')}`;
