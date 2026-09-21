@@ -1216,13 +1216,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.12';
-const BUILD_TIME  = '202609011200';   // yyyymmddhhmm
+const APP_VERSION = 'v2.13';
+const BUILD_TIME  = '202609201200';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.13', date: '2026-09-20', tags: ['feat'],
+    changes: [
+      '偏差値グラフの早稲アカSS基準線をSS1（偏差値60）・SS2（偏差値56）の2本に分解',
+      '従来のSS基準線（56）はSS2として引き継ぎ。SS1（60）はデフォルト非表示でトグルから表示可能',
+    ]
+  },
   {
     version: 'v2.12', date: '2026-09-01', tags: ['feat'],
     changes: [
@@ -2541,10 +2548,23 @@ function renderDeviationChart() {
     order: 0,
   });
 
-  // 早稲アカSSランク基準ライン（56・実線）
+  // 早稲アカSSランク基準ライン（SS1=60・SS2=56、それぞれ実線）
   datasets.push({
     type: 'line',
-    label: '🎯 早稲アカSS (56)',
+    label: '🎯 早稲アカSS1 (60)',
+    data: groups.map(() => 60),
+    borderColor: '#d6336c',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    pointRadius: 0,
+    tension: 0,
+    fill: false,
+    spanGaps: true,
+    order: 1,
+  });
+  datasets.push({
+    type: 'line',
+    label: '🎯 早稲アカSS2 (56)',
     data: groups.map(() => 56),
     borderColor: '#e67700',
     backgroundColor: 'transparent',
@@ -2598,7 +2618,7 @@ function renderDeviationChart() {
   // Y軸レンジを動的計算（全データ値＋志望校ラインを考慮）
   const allYValues = [
     ...groups.map(g => g.totalDeviation).filter(v => v != null && v !== 0),
-    56,
+    56, 60,
     ...schools.flatMap(s => [s.targetDeviationFrom ?? s.targetDeviation, s.targetDeviationTo ?? s.targetDeviation]).filter(v => v != null),
   ];
   const yMinRaw = allYValues.length ? Math.min(...allYValues) : 45;
@@ -2636,7 +2656,7 @@ function renderDeviationChart() {
     const icon = isBar
       ? `<span style="display:inline-block;width:12px;height:12px;background:${color};border-radius:2px;vertical-align:middle;margin-right:3px;"></span>`
       : `<span style="display:inline-block;width:16px;height:3px;background:${color};vertical-align:middle;margin-right:3px;border-radius:2px;"></span>`;
-    const isOn = ds.label === '総合' || ds.label.includes('C50') || ds.label.includes('早稲アカSS');
+    const isOn = ds.label === '総合' || ds.label.includes('C50') || ds.label.includes('早稲アカSS2');
     return `<label style="display:inline-flex;align-items:center;font-size:12px;cursor:pointer;padding:3px 7px;border-radius:12px;border:1px solid var(--border);background:var(--card-bg);">
       <input type="checkbox" ${isOn?'checked':''} onchange="toggleDeviationDataset(${i},this.checked)" style="margin-right:4px;accent-color:${color};">
       ${icon}${ds.label}
@@ -2698,7 +2718,7 @@ function renderSubjectCharts() {
   const allSubjectDevs = groups.flatMap(g =>
     TEST_SUBJECTS.map(s => { const sub = g.subjects[s.key]; return sub?.deviation ?? null; })
   ).filter(v => v != null);
-  allSubjectDevs.push(56);
+  allSubjectDevs.push(56, 60);
   const sYMinRaw = Math.min(...allSubjectDevs);
   const sYMaxRaw = Math.max(...allSubjectDevs);
   const sYMin = Math.max(0,  Math.floor((sYMinRaw - 5) / 5) * 5);
@@ -2719,7 +2739,18 @@ function renderSubjectCharts() {
           borderRadius: 4,
         }, {
           type: 'line',
-          label: '早稲アカSS (56)',
+          label: '早稲アカSS1 (60)',
+          data: groups.map(() => 60),
+          borderColor: '#d6336c',
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0,
+          fill: false,
+          spanGaps: true,
+        }, {
+          type: 'line',
+          label: '早稲アカSS2 (56)',
           data: groups.map(() => 56),
           borderColor: '#e67700',
           backgroundColor: 'transparent',
