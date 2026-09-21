@@ -1216,13 +1216,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.13';
-const BUILD_TIME  = '202609201200';   // yyyymmddhhmm
+const APP_VERSION = 'v2.14';
+const BUILD_TIME  = '202609211200';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.14', date: '2026-09-21', tags: ['fix'],
+    changes: [
+      'データ点が1つしかない回（例：初めて登録した過去問の回）で基準線（SS1/SS2・志望校C50/A80）が' +
+      '非表示になる不具合を修正。該当ケースでは基準線を点マーカーで表示するように変更',
+    ]
+  },
   {
     version: 'v2.13', date: '2026-09-20', tags: ['feat'],
     changes: [
@@ -2548,15 +2555,20 @@ function renderDeviationChart() {
     order: 0,
   });
 
+  // 基準ライン系データセットの点マーカー半径
+  // データ点（X軸カテゴリ）が1つしかない場合、pointRadius:0だと線を結ぶ相手がおらず
+  // 何も描画されない（チェックボックスはONなのに非表示に見える）ため、点を表示して視認できるようにする
+  const refPointRadius = groups.length <= 1 ? 4 : 0;
+
   // 早稲アカSSランク基準ライン（SS1=60・SS2=56、それぞれ実線）
   datasets.push({
     type: 'line',
     label: '🎯 早稲アカSS1 (60)',
     data: groups.map(() => 60),
     borderColor: '#d6336c',
-    backgroundColor: 'transparent',
+    backgroundColor: '#d6336c',
     borderWidth: 2,
-    pointRadius: 0,
+    pointRadius: refPointRadius,
     tension: 0,
     fill: false,
     spanGaps: true,
@@ -2567,9 +2579,9 @@ function renderDeviationChart() {
     label: '🎯 早稲アカSS2 (56)',
     data: groups.map(() => 56),
     borderColor: '#e67700',
-    backgroundColor: 'transparent',
+    backgroundColor: '#e67700',
     borderWidth: 2,
-    pointRadius: 0,
+    pointRadius: refPointRadius,
     tension: 0,
     fill: false,
     spanGaps: true,
@@ -2588,10 +2600,10 @@ function renderDeviationChart() {
       label: `🏫 ${school.name} C50`,
       data: groups.map(() => c50),
       borderColor: color + '99',
-      backgroundColor: 'transparent',
+      backgroundColor: color,
       borderWidth: 1.5,
       borderDash: [3, 4],
-      pointRadius: 0,
+      pointRadius: refPointRadius,
       tension: 0,
       fill: false,
       spanGaps: true,
@@ -2604,10 +2616,10 @@ function renderDeviationChart() {
       hidden: true,
       data: groups.map(() => a80),
       borderColor: color,
-      backgroundColor: 'transparent',
+      backgroundColor: color,
       borderWidth: 2.5,
       borderDash: [8, 4],
-      pointRadius: 0,
+      pointRadius: refPointRadius,
       tension: 0,
       fill: false,
       spanGaps: true,
@@ -2724,6 +2736,9 @@ function renderSubjectCharts() {
   const sYMin = Math.max(0,  Math.floor((sYMinRaw - 5) / 5) * 5);
   const sYMax = Math.min(100, Math.ceil((sYMaxRaw + 5) / 5) * 5);
 
+  // データ点が1つしかないと pointRadius:0 の線は描画されないため、その場合だけ点を出す
+  const subjectRefPointRadius = groups.length <= 1 ? 4 : 0;
+
   TEST_SUBJECTS.forEach(s => {
     if (_subjectChartInstances[s.key]) { _subjectChartInstances[s.key].destroy(); }
     _subjectChartInstances[s.key] = new Chart(document.getElementById(`subjectChart_${s.key}`), {
@@ -2742,9 +2757,9 @@ function renderSubjectCharts() {
           label: '早稲アカSS1 (60)',
           data: groups.map(() => 60),
           borderColor: '#d6336c',
-          backgroundColor: 'transparent',
+          backgroundColor: '#d6336c',
           borderWidth: 2,
-          pointRadius: 0,
+          pointRadius: subjectRefPointRadius,
           tension: 0,
           fill: false,
           spanGaps: true,
@@ -2753,9 +2768,9 @@ function renderSubjectCharts() {
           label: '早稲アカSS2 (56)',
           data: groups.map(() => 56),
           borderColor: '#e67700',
-          backgroundColor: 'transparent',
+          backgroundColor: '#e67700',
           borderWidth: 2,
-          pointRadius: 0,
+          pointRadius: subjectRefPointRadius,
           tension: 0,
           fill: false,
           spanGaps: true,
