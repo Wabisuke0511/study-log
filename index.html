@@ -539,6 +539,11 @@
     .cal-cell.sun  .cal-day { color: var(--danger); }
     .cal-cell.sat  .cal-day { color: #1c7ed6; }
     .cal-cell.today .cal-day { color: var(--primary); font-weight: 800; }
+    .cal-holiday {
+      font-size: 8px; line-height: 1.15; text-align: center; color: var(--danger);
+      font-weight: 700; word-break: break-all; margin-top: 1px;
+    }
+    .cal-detail-holiday { color: var(--danger); font-size: 13px; font-weight: 700; margin: -4px 0 8px; }
     .cal-events { flex: 1; display: flex; flex-direction: column; gap: 2px; margin-top: 3px; }
     .cal-event {
       display: flex; flex-direction: column; align-items: center;
@@ -1247,13 +1252,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.16';
-const BUILD_TIME  = '202610031200';   // yyyymmddhhmm
+const APP_VERSION = 'v2.17';
+const BUILD_TIME  = '202610031500';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.17', date: '2026-10-03', tags: ['feat'],
+    changes: [
+      'カレンダーに祝日を表示。日曜と同じ赤字で、日付の下に祝日名を表示する',
+      '振替休日・国民の休日にも対応。日付を選ぶと詳細にも祝日名を表示',
+    ]
+  },
   {
     version: 'v2.16', date: '2026-10-03', tags: ['feat', 'fix'],
     changes: [
@@ -3221,6 +3233,56 @@ let calYear  = CAL_START.y;
 let calMonth = CAL_START.m;
 let calSelectedDate = null;
 
+// -----------------------------------------------------
+//  日本の祝日（2020年以降の制度。春分・秋分は近似式で計算）
+// -----------------------------------------------------
+const _holidayCache = {};
+function holidaysOfYear(y) {
+  if (_holidayCache[y]) return _holidayCache[y];
+  const map = {};
+  const put = (m, d, name) => { map[dateString(y, m, d)] = name; };
+  // 第n月曜日の日付
+  const nthMon = (m, n) => {
+    const first = new Date(y, m - 1, 1).getDay();
+    return 1 + ((8 - first) % 7) + (n - 1) * 7;
+  };
+  const k = Math.floor((y - 1980) / 4);
+  put(1, 1, '元日');
+  put(1, nthMon(1, 2), '成人の日');
+  put(2, 11, '建国記念の日');
+  put(2, 23, '天皇誕生日');
+  put(3, Math.floor(20.8431 + 0.242194 * (y - 1980) - k), '春分の日');
+  put(4, 29, '昭和の日');
+  put(5, 3, '憲法記念日');
+  put(5, 4, 'みどりの日');
+  put(5, 5, 'こどもの日');
+  put(7, nthMon(7, 3), '海の日');
+  put(8, 11, '山の日');
+  put(9, nthMon(9, 3), '敬老の日');
+  put(9, Math.floor(23.2488 + 0.242194 * (y - 1980) - k), '秋分の日');
+  put(10, nthMon(10, 2), 'スポーツの日');
+  put(11, 3, '文化の日');
+  put(11, 23, '勤労感謝の日');
+
+  const next = ds => { const t = new Date(ds + 'T00:00:00'); t.setDate(t.getDate() + 1); return dateString(t.getFullYear(), t.getMonth() + 1, t.getDate()); };
+  const prev = ds => { const t = new Date(ds + 'T00:00:00'); t.setDate(t.getDate() - 1); return dateString(t.getFullYear(), t.getMonth() + 1, t.getDate()); };
+  // 振替休日：日曜の祝日は、次の祝日でない日が休みになる
+  for (const ds of Object.keys(map)) {
+    if (new Date(ds + 'T00:00:00').getDay() !== 0) continue;
+    let t = next(ds);
+    while (map[t]) t = next(t);
+    if (t.startsWith(y + '-')) map[t] = '振替休日';
+  }
+  // 国民の休日：祝日に挟まれた平日
+  for (const ds of Object.keys(map)) {
+    const t = next(next(ds));
+    const mid = next(ds);
+    if (map[t] && !map[mid] && new Date(mid + 'T00:00:00').getDay() !== 0 && mid.startsWith(y + '-')) map[mid] = '国民の休日';
+  }
+  return (_holidayCache[y] = map);
+}
+function getHoliday(ds) { return holidaysOfYear(Number(ds.slice(0, 4)))[ds] || ''; }
+
 // 年月を「開始月からの通し番号」に変換する（範囲判定・前後移動用）
 function calMonthIndex(y, m) { return y * 12 + (m - 1); }
 const CAL_MIN_IDX = calMonthIndex(CAL_START.y, CAL_START.m);
@@ -3310,10 +3372,11 @@ function renderCalendar() {
       html += `<div class="cal-cell out-of-range"><div class="cal-day">${d}</div></div>`;
       continue;
     }
+    const holiday = getHoliday(ds);
     const events = getCalEvents(ds);
     const cls = [
       'cal-cell',
-      dow === 0 ? 'sun' : dow === 6 ? 'sat' : '',
+      (dow === 0 || holiday) ? 'sun' : dow === 6 ? 'sat' : '',
       ds === today ? 'today' : '',
       events.length ? 'has-event' : '',
       ds === calSelectedDate ? 'selected' : '',
@@ -3327,6 +3390,7 @@ function renderCalendar() {
     ).join('');
     html += `<div class="${cls}" data-date="${ds}" onclick="selectCalDate('${ds}')">
       <div class="cal-day">${d}</div>
+      ${holiday ? `<div class="cal-holiday">${holiday}</div>` : ''}
       <div class="cal-events" id="calEvents-${ds}">${chips}</div>
     </div>`;
   }
@@ -3351,6 +3415,7 @@ function renderCalendar() {
       : '<div class="cal-detail-empty">この日の予定はありません。</div>';
     detail.innerHTML = `
       <div class="cal-detail-date">${calSelectedDate.split('-')[0]}年${formatDate(calSelectedDate)}</div>
+      ${getHoliday(calSelectedDate) ? `<div class="cal-detail-holiday">🎌 ${getHoliday(calSelectedDate)}</div>` : ''}
       ${body}
       <div class="cal-add-form">
         <select id="calAddKind" class="cal-add-kind" onchange="onCalAddKindChange()">
