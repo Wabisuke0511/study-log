@@ -550,6 +550,7 @@
     .cal-event .ev-round { font-size: 9px; white-space: nowrap; }
     .cal-event.kumiwake   { background: var(--c-total); }
     .cal-event.curriculum { background: var(--c-shakai); }
+    .cal-event.other      { background: var(--c-sansu); }
     .cal-cell.has-event { background: #f3eef8; }
     .cal-cell.has-event.selected { background: #e3f0ff; }
 
@@ -573,20 +574,15 @@
 
     /* 予定の追加フォーム（詳細パネル内） */
     .cal-add-form {
-      display: flex; gap: 6px; margin-top: 8px;
+      display: flex; flex-direction: column; gap: 8px; margin-top: 10px;
     }
-    .cal-add-kind {
-      flex-shrink: 0; padding: 8px 6px; font-size: 12px;
-      border: 1px solid var(--border); border-radius: var(--radius-sm);
-      background: var(--card); color: var(--text);
-    }
-    .cal-add-round {
-      flex: 1; min-width: 0; padding: 8px 10px; font-size: 13px;
+    .cal-add-kind, .cal-add-round {
+      width: 100%; box-sizing: border-box; padding: 11px 12px; font-size: 16px;
       border: 1px solid var(--border); border-radius: var(--radius-sm);
       background: var(--card); color: var(--text);
     }
     .cal-add-btn {
-      flex-shrink: 0; padding: 8px 12px; font-size: 13px; font-weight: 700;
+      width: 100%; min-height: 44px; padding: 11px 12px; font-size: 16px; font-weight: 700;
       border: none; border-radius: var(--radius-sm);
       background: var(--primary); color: #fff; cursor: pointer;
     }
@@ -598,6 +594,7 @@
     }
     .dot.kumiwake   { background: var(--c-total); }
     .dot.curriculum { background: var(--c-shakai); }
+    .dot.other      { background: var(--c-sansu); }
 
     /* 日程一覧（カレンダー下） */
     .cal-list { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
@@ -616,10 +613,12 @@
     }
     .cal-list-item.kumiwake   { border-left-color: var(--c-total); }
     .cal-list-item.curriculum { border-left-color: var(--c-shakai); }
+    .cal-list-item.other      { border-left-color: var(--c-sansu); }
     .cal-list-item.past { opacity: 0.45; }
     .cal-list-item.next { border-color: var(--primary); background: #eef5ff; }
     .cal-list-item.next.kumiwake   { border-left-color: var(--c-total); }
     .cal-list-item.next.curriculum { border-left-color: var(--c-shakai); }
+    .cal-list-item.next.other      { border-left-color: var(--c-sansu); }
     .cal-list-body { min-width: 0; }
     .cal-list-date  { font-size: 12px; color: var(--text-secondary); }
     .cal-list-label { font-size: 14px; font-weight: 700; margin-top: 1px; }
@@ -1248,13 +1247,21 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.15';
-const BUILD_TIME  = '202609301200';   // yyyymmddhhmm
+const APP_VERSION = 'v2.16';
+const BUILD_TIME  = '202610031200';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.16', date: '2026-10-03', tags: ['feat', 'fix'],
+    changes: [
+      '日程に「その他」を追加。組分け・カリキュラム以外の試験も試験名を自由入力して登録できる',
+      '予定の追加フォームを縦並び・全幅に変更し、ボタンを大きくした（iPhoneで押せない問題を修正）',
+      '入力欄の文字サイズを16pxにして、iPhoneで入力時に画面が拡大されないようにした',
+    ]
+  },
   {
     version: 'v2.15', date: '2026-09-30', tags: ['feat'],
     changes: [
@@ -3093,6 +3100,7 @@ const CAL_DOW = ['日','月','火','水','木','金','土'];
 const CAL_KINDS = {
   kumiwake:   { name: '組分けテスト',     short: '組分け' },
   curriculum: { name: 'カリキュラムテスト', short: 'カリ'   },
+  other:      { name: 'その他',           short: 'その他' },   // 自由入力（試験名をそのまま表示）
 };
 
 // 日程が発表されたらここに追記するだけでカレンダー・詳細・一覧すべてに反映される
@@ -3134,6 +3142,11 @@ function saveCalDeletedSeedKeys(list) { localStorage.setItem('calDeletedSeedKeys
 // プリセット＋ユーザー追加分をまとめて再構築する（追加・削除のたびに呼ぶ）
 let CAL_EVENTS = [];
 let CAL_EVENTS_BY_DATE = {};
+// 表示名：組分け・カリキュラムは「回数＋種別名」、その他は入力した試験名そのまま
+function calEventLabel(kind, round) {
+  return kind === 'other' ? round : `${round}${CAL_KINDS[kind].name}`;
+}
+
 function rebuildCalEvents() {
   const deletedKeys = new Set(loadCalDeletedSeedKeys());
   const seed   = CAL_EVENTS_SEED.filter(ev => !deletedKeys.has(calEventKey(ev)));
@@ -3143,7 +3156,7 @@ function rebuildCalEvents() {
     ...ev,
     name:  CAL_KINDS[ev.kind].name,
     short: CAL_KINDS[ev.kind].short,
-    label: `${ev.round}${CAL_KINDS[ev.kind].name}`,   // 例：第6回組分けテスト
+    label: calEventLabel(ev.kind, ev.round),   // 例：第6回組分けテスト
   })).sort((a, b) => a.date.localeCompare(b.date));
 
   // 日付 → イベント配列（同じ日に複数入っても表示できるようにしておく）
@@ -3159,6 +3172,13 @@ function getCalEvents(ds) { return CAL_EVENTS_BY_DATE[ds] || []; }
 // 文字列を onclick 属性の ' で囲んだ引数として安全に埋め込むためのエスケープ
 function escapeJsStr(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
 
+// 種別が「その他」のときは試験名の自由入力であることが分かるようにプレースホルダを切り替える
+function onCalAddKindChange() {
+  const kind = document.getElementById('calAddKind').value;
+  document.getElementById('calAddRound').placeholder =
+    kind === 'other' ? '試験名を自由に入力（例：英検3級）' : '例：第10回／第20-21回';
+}
+
 // 選択中の日付に予定を追加する（カレンダー詳細パネルの「＋ 追加」ボタン）
 function addCalEvent() {
   const ds = calSelectedDate;
@@ -3166,7 +3186,7 @@ function addCalEvent() {
   const kind  = document.getElementById('calAddKind').value;
   const roundInput = document.getElementById('calAddRound');
   const round = roundInput.value.trim();
-  if (!round) { alert('回数・範囲を入力してください（例：第10回）'); return; }
+  if (!round) { alert(kind === 'other' ? '試験名を入力してください' : '回数・範囲を入力してください（例：第10回）'); return; }
 
   const custom = loadCalCustomEvents();
   custom.push({ id: Date.now(), date: ds, kind, round, custom: true });
@@ -3180,7 +3200,7 @@ function addCalEvent() {
 // 予定を削除する（詳細パネル・下の一覧、どちらの✕ボタンからも呼ばれる）
 // customId が null ならプリセット予定、数値ならユーザー追加分のid
 function deleteCalEventByKey(date, kind, round, customId) {
-  const label = `${round}${CAL_KINDS[kind].name}`;
+  const label = calEventLabel(kind, round);
   if (!confirm(`「${label}」（${formatDate(date)}）を削除しますか？`)) return;
 
   if (customId !== null) {
@@ -3333,10 +3353,10 @@ function renderCalendar() {
       <div class="cal-detail-date">${calSelectedDate.split('-')[0]}年${formatDate(calSelectedDate)}</div>
       ${body}
       <div class="cal-add-form">
-        <select id="calAddKind" class="cal-add-kind">
+        <select id="calAddKind" class="cal-add-kind" onchange="onCalAddKindChange()">
           ${Object.entries(CAL_KINDS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}
         </select>
-        <input type="text" id="calAddRound" class="cal-add-round" placeholder="例：第10回／第20-21回">
+        <input type="text" id="calAddRound" class="cal-add-round" placeholder="例：第10回／第20-21回" enterkeyhint="done">
         <button class="cal-add-btn" onclick="addCalEvent()">＋ 追加</button>
       </div>`;
     detail.style.display = 'block';
