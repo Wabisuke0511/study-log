@@ -570,6 +570,7 @@
       background: var(--input-bg); margin-bottom: 6px;
     }
     .cal-detail-event .name { font-size: 14px; font-weight: 700; flex: 1; }
+    .cal-detail-event .ev-time { display: block; font-size: 12px; font-weight: 400; color: var(--text-secondary); margin-top: 1px; }
     .cal-event-del {
       flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
       border: none; background: transparent; color: var(--text-secondary);
@@ -1252,13 +1253,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.18';
-const BUILD_TIME  = '202610031700';   // yyyymmddhhmm
+const APP_VERSION = 'v2.19';
+const BUILD_TIME  = '202610031800';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.19', date: '2026-10-03', tags: ['feat'],
+    changes: [
+      '検定の日程を登録（第2回・第3回の筆記／一次合格発表／二次試験B日程／二次合格発表）',
+      '予定に時間を表示できるようにした（詳細パネル・日程一覧）',
+    ]
+  },
   {
     version: 'v2.18', date: '2026-10-03', tags: ['fix'],
     changes: [
@@ -3138,6 +3146,15 @@ const CAL_EVENTS_SEED = [
   { date: '2026-12-13', kind: 'kumiwake',   round: '第8回'     },
   { date: '2027-01-16', kind: 'curriculum', round: '第16-18回' },
   { date: '2027-01-24', kind: 'kumiwake',   round: '第9回'     },
+  // 検定（筆記・二次試験とそれぞれの合格発表）。time は詳細・一覧に表示、abbr/short はカレンダーのセル用
+  { date: '2026-10-04', kind: 'other', round: '第2回検定 筆記（一次試験）', time: '13:00–16:00', short: '検定', abbr: '筆記' },
+  { date: '2026-10-26', kind: 'other', round: '第2回検定 一次試験 合格発表', time: '13:00–14:00', short: '検定', abbr: '一次発表' },
+  { date: '2026-11-15', kind: 'other', round: '第2回検定 二次試験（B日程）', time: '12:30–15:00', short: '検定', abbr: '二次' },
+  { date: '2026-11-24', kind: 'other', round: '第2回検定 二次試験（B日程） 合格発表', time: '13:00–14:00', short: '検定', abbr: '二次発表' },
+  { date: '2027-01-24', kind: 'other', round: '第3回検定 筆記（一次試験）', time: '13:00–16:00', short: '検定', abbr: '筆記' },
+  { date: '2027-02-15', kind: 'other', round: '第3回検定 一次試験 合格発表', time: '13:00–14:00', short: '検定', abbr: '一次発表' },
+  { date: '2027-03-07', kind: 'other', round: '第3回検定 二次試験（B日程）', time: '12:30–15:00', short: '検定', abbr: '二次' },
+  { date: '2027-03-16', kind: 'other', round: '第3回検定 二次試験（B日程） 合格発表', time: '13:00–14:00', short: '検定', abbr: '二次発表' },
 ];
 
 // ── 予定の追加・削除（この端末のブラウザに保存。※他端末とは同期されません）──
@@ -3174,7 +3191,7 @@ function rebuildCalEvents() {
   CAL_EVENTS = [...seed, ...custom].map(ev => ({
     ...ev,
     name:  CAL_KINDS[ev.kind].name,
-    short: CAL_KINDS[ev.kind].short,
+    short: ev.short ?? CAL_KINDS[ev.kind].short,
     label: calEventLabel(ev.kind, ev.round),   // 例：第6回組分けテスト
   })).sort((a, b) => a.date.localeCompare(b.date));
 
@@ -3392,7 +3409,7 @@ function renderCalendar() {
     const chips = events.map(ev =>
       `<div class="cal-event ${ev.kind}" title="${ev.label}">
          <span class="ev-name">${ev.short}</span>
-         <span class="ev-round">${ev.round}</span>
+         <span class="ev-round">${ev.abbr || ev.round}</span>
        </div>`
     ).join('');
     html += `<div class="${cls}" data-date="${ds}" onclick="selectCalDate('${ds}')">
@@ -3415,7 +3432,7 @@ function renderCalendar() {
       ? events.map(ev => `
           <div class="cal-detail-event">
             <span class="dot ${ev.kind}"></span>
-            <span class="name">${ev.label}</span>
+            <span class="name">${ev.label}${ev.time ? `<span class="ev-time">${ev.time}</span>` : ''}</span>
             <button class="cal-event-del" title="削除"
               onclick="deleteCalEventByKey('${ev.date}','${ev.kind}','${escapeJsStr(ev.round)}', ${ev.custom ? ev.id : 'null'})">✕</button>
           </div>`).join('')
@@ -3484,6 +3501,7 @@ function renderCalList() {
           <div class="cal-list-body">
             <div class="cal-list-date">${ev.date.split('-')[0]}年${formatDate(ev.date)}</div>
             <div class="cal-list-label">${ev.label}</div>
+            ${ev.time ? `<div class="cal-list-date">${ev.time}</div>` : ''}
           </div>
           ${badge ? `<span class="cal-list-badge">${badge}</span>` : ''}
           <button class="cal-list-del" title="削除"
