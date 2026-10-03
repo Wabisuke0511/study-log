@@ -1252,13 +1252,20 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.17';
-const BUILD_TIME  = '202610031500';   // yyyymmddhhmm
+const APP_VERSION = 'v2.18';
+const BUILD_TIME  = '202610031700';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.18', date: '2026-10-03', tags: ['fix'],
+    changes: [
+      'スマホで更新が反映されない問題を修正。最新版が公開されたら自動で再読み込みされる',
+      'アプリに戻ったときにも更新を確認するようにした',
+    ]
+  },
   {
     version: 'v2.17', date: '2026-10-03', tags: ['feat'],
     changes: [
@@ -3528,7 +3535,22 @@ document.addEventListener('visibilitychange', () => {
 
 // Service Worker 登録（ホーム画面追加時のキャッシュ自動更新のため）
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js').catch(console.warn);
+  // 新しいService Workerに切り替わったらページを自動で再読み込みして最新版を反映する
+  // （初回インストール時は切り替えではないので再読み込みしない）
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    // ホーム画面のアプリはバックグラウンドから戻っても再読み込みされないので、
+    // 画面に戻るたびに更新を確認する
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
+  }).catch(console.warn);
 }
 
 // =====================================================

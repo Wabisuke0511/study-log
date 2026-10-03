@@ -1,5 +1,5 @@
 // キャッシュ名：デプロイのたびに更新する（app versionと合わせる）
-const CACHE = 'study-tracker-v217';
+const CACHE = 'study-tracker-v218';
 
 // インストール直後に即アクティブ化
 self.addEventListener('install', () => self.skipWaiting());
@@ -20,7 +20,7 @@ self.addEventListener('fetch', e => {
   // → デプロイ後すぐに最新版が反映される
   if (e.request.mode === 'navigate') {
     e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
+      fetch(e.request, { cache: 'no-store' }).catch(() => caches.match(e.request))
     );
     return;
   }
