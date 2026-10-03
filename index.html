@@ -563,7 +563,33 @@
       padding: 10px 12px; border-radius: var(--radius-sm);
       background: var(--input-bg); margin-bottom: 6px;
     }
-    .cal-detail-event .name { font-size: 14px; font-weight: 700; }
+    .cal-detail-event .name { font-size: 14px; font-weight: 700; flex: 1; }
+    .cal-event-del {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+      border: none; background: transparent; color: var(--text-secondary);
+      font-size: 13px; cursor: pointer; line-height: 1;
+    }
+    .cal-event-del:hover { background: #0000000f; color: var(--danger); }
+
+    /* 予定の追加フォーム（詳細パネル内） */
+    .cal-add-form {
+      display: flex; gap: 6px; margin-top: 8px;
+    }
+    .cal-add-kind {
+      flex-shrink: 0; padding: 8px 6px; font-size: 12px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--card); color: var(--text);
+    }
+    .cal-add-round {
+      flex: 1; min-width: 0; padding: 8px 10px; font-size: 13px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      background: var(--card); color: var(--text);
+    }
+    .cal-add-btn {
+      flex-shrink: 0; padding: 8px 12px; font-size: 13px; font-weight: 700;
+      border: none; border-radius: var(--radius-sm);
+      background: var(--primary); color: #fff; cursor: pointer;
+    }
 
     /* テスト種別の色ドット（詳細・凡例で共用） */
     .dot {
@@ -602,6 +628,12 @@
       font-size: 11px; font-weight: 700; color: var(--primary);
     }
     .cal-list-item.past .cal-list-badge { color: var(--text-secondary); }
+    .cal-list-del {
+      flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+      border: none; background: transparent; color: var(--text-secondary);
+      font-size: 13px; cursor: pointer; line-height: 1; margin-left: 2px;
+    }
+    .cal-list-del:hover { background: #0000000f; color: var(--danger); }
     .cal-range-note {
       font-size: 12px; color: var(--text-secondary); margin-top: 12px; text-align: center;
     }
@@ -1216,13 +1248,22 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  バージョン・変更履歴
 // =====================================================
 // デプロイのたびに必ず両方更新すること
-const APP_VERSION = 'v2.14';
-const BUILD_TIME  = '202609211200';   // yyyymmddhhmm
+const APP_VERSION = 'v2.15';
+const BUILD_TIME  = '202609301200';   // yyyymmddhhmm
 
 document.getElementById('versionBadge').textContent = APP_VERSION;
 document.getElementById('buildTime').textContent    = BUILD_TIME;
 
 const CHANGELOG = [
+  {
+    version: 'v2.15', date: '2026-09-30', tags: ['feat'],
+    changes: [
+      'テストスケジュール（📅日程タブ）で予定を追加・削除できるように変更',
+      'カレンダーで日付を選ぶと、その日の予定に「＋追加」フォームが表示される',
+      '各予定（詳細パネル・下の一覧どちらも）に✕ボタンを追加。プリセットの予定も削除可能',
+      '※追加・削除した予定はこの端末（ブラウザ）にのみ保存され、他端末とは同期されません',
+    ]
+  },
   {
     version: 'v2.14', date: '2026-09-21', tags: ['fix'],
     changes: [
@@ -3056,7 +3097,9 @@ const CAL_KINDS = {
 
 // 日程が発表されたらここに追記するだけでカレンダー・詳細・一覧すべてに反映される
 // round は各テストの回数表記（組分け＝第1〜9回、カリキュラム＝予習シリーズの範囲）
-const CAL_EVENTS = [
+// ※ これは初期プリセット。ユーザーが画面から追加した予定は別途 localStorage に保存され、
+//   ここを削除しても消えない（下の calCustomEvents / calDeletedSeedKeys 参照）
+const CAL_EVENTS_SEED = [
   { date: '2026-09-12', kind: 'curriculum', round: '第1-2回'   },
   { date: '2026-09-26', kind: 'curriculum', round: '第3-4回'   },
   { date: '2026-10-04', kind: 'kumiwake',   round: '第6回'     },
@@ -3068,20 +3111,90 @@ const CAL_EVENTS = [
   { date: '2026-12-13', kind: 'kumiwake',   round: '第8回'     },
   { date: '2027-01-16', kind: 'curriculum', round: '第16-18回' },
   { date: '2027-01-24', kind: 'kumiwake',   round: '第9回'     },
-].map(ev => ({
-  ...ev,
-  name:  CAL_KINDS[ev.kind].name,
-  short: CAL_KINDS[ev.kind].short,
-  label: `${ev.round}${CAL_KINDS[ev.kind].name}`,   // 例：第6回組分けテスト
-})).sort((a, b) => a.date.localeCompare(b.date));
+];
 
-// 日付 → イベント配列（同じ日に複数入っても表示できるようにしておく）
-const CAL_EVENTS_BY_DATE = CAL_EVENTS.reduce((map, ev) => {
-  (map[ev.date] = map[ev.date] || []).push(ev);
-  return map;
-}, {});
+// ── 予定の追加・削除（この端末のブラウザに保存。※他端末とは同期されません）──
+// calCustomEvents     : ユーザーが画面から追加した予定
+// calDeletedSeedKeys  : 削除された初期プリセット予定のキー（date|kind|round）。
+//                        プリセット自体は書き換えず、表示側で除外するだけにしておく
+function calEventKey(ev) { return `${ev.date}|${ev.kind}|${ev.round}`; }
+
+function loadCalCustomEvents() {
+  try { return JSON.parse(localStorage.getItem('calCustomEvents') || '[]'); }
+  catch { return []; }
+}
+function saveCalCustomEvents(list) { localStorage.setItem('calCustomEvents', JSON.stringify(list)); }
+
+function loadCalDeletedSeedKeys() {
+  try { return JSON.parse(localStorage.getItem('calDeletedSeedKeys') || '[]'); }
+  catch { return []; }
+}
+function saveCalDeletedSeedKeys(list) { localStorage.setItem('calDeletedSeedKeys', JSON.stringify(list)); }
+
+// プリセット＋ユーザー追加分をまとめて再構築する（追加・削除のたびに呼ぶ）
+let CAL_EVENTS = [];
+let CAL_EVENTS_BY_DATE = {};
+function rebuildCalEvents() {
+  const deletedKeys = new Set(loadCalDeletedSeedKeys());
+  const seed   = CAL_EVENTS_SEED.filter(ev => !deletedKeys.has(calEventKey(ev)));
+  const custom = loadCalCustomEvents();
+
+  CAL_EVENTS = [...seed, ...custom].map(ev => ({
+    ...ev,
+    name:  CAL_KINDS[ev.kind].name,
+    short: CAL_KINDS[ev.kind].short,
+    label: `${ev.round}${CAL_KINDS[ev.kind].name}`,   // 例：第6回組分けテスト
+  })).sort((a, b) => a.date.localeCompare(b.date));
+
+  // 日付 → イベント配列（同じ日に複数入っても表示できるようにしておく）
+  CAL_EVENTS_BY_DATE = CAL_EVENTS.reduce((map, ev) => {
+    (map[ev.date] = map[ev.date] || []).push(ev);
+    return map;
+  }, {});
+}
+rebuildCalEvents();
 
 function getCalEvents(ds) { return CAL_EVENTS_BY_DATE[ds] || []; }
+
+// 文字列を onclick 属性の ' で囲んだ引数として安全に埋め込むためのエスケープ
+function escapeJsStr(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+// 選択中の日付に予定を追加する（カレンダー詳細パネルの「＋ 追加」ボタン）
+function addCalEvent() {
+  const ds = calSelectedDate;
+  if (!ds) return;
+  const kind  = document.getElementById('calAddKind').value;
+  const roundInput = document.getElementById('calAddRound');
+  const round = roundInput.value.trim();
+  if (!round) { alert('回数・範囲を入力してください（例：第10回）'); return; }
+
+  const custom = loadCalCustomEvents();
+  custom.push({ id: Date.now(), date: ds, kind, round, custom: true });
+  saveCalCustomEvents(custom);
+  roundInput.value = '';
+
+  rebuildCalEvents();
+  renderCalendar();
+}
+
+// 予定を削除する（詳細パネル・下の一覧、どちらの✕ボタンからも呼ばれる）
+// customId が null ならプリセット予定、数値ならユーザー追加分のid
+function deleteCalEventByKey(date, kind, round, customId) {
+  const label = `${round}${CAL_KINDS[kind].name}`;
+  if (!confirm(`「${label}」（${formatDate(date)}）を削除しますか？`)) return;
+
+  if (customId !== null) {
+    saveCalCustomEvents(loadCalCustomEvents().filter(e => e.id !== customId));
+  } else {
+    const deleted = loadCalDeletedSeedKeys();
+    const key = calEventKey({ date, kind, round });
+    if (!deleted.includes(key)) deleted.push(key);
+    saveCalDeletedSeedKeys(deleted);
+  }
+
+  rebuildCalEvents();
+  renderCalendar();
+}
 
 // 表示中の月と選択中の日付
 let calYear  = CAL_START.y;
@@ -3212,11 +3325,20 @@ function renderCalendar() {
           <div class="cal-detail-event">
             <span class="dot ${ev.kind}"></span>
             <span class="name">${ev.label}</span>
+            <button class="cal-event-del" title="削除"
+              onclick="deleteCalEventByKey('${ev.date}','${ev.kind}','${escapeJsStr(ev.round)}', ${ev.custom ? ev.id : 'null'})">✕</button>
           </div>`).join('')
       : '<div class="cal-detail-empty">この日の予定はありません。</div>';
     detail.innerHTML = `
       <div class="cal-detail-date">${calSelectedDate.split('-')[0]}年${formatDate(calSelectedDate)}</div>
-      ${body}`;
+      ${body}
+      <div class="cal-add-form">
+        <select id="calAddKind" class="cal-add-kind">
+          ${Object.entries(CAL_KINDS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('')}
+        </select>
+        <input type="text" id="calAddRound" class="cal-add-round" placeholder="例：第10回／第20-21回">
+        <button class="cal-add-btn" onclick="addCalEvent()">＋ 追加</button>
+      </div>`;
     detail.style.display = 'block';
   } else {
     detail.innerHTML = '';
@@ -3272,6 +3394,8 @@ function renderCalList() {
             <div class="cal-list-label">${ev.label}</div>
           </div>
           ${badge ? `<span class="cal-list-badge">${badge}</span>` : ''}
+          <button class="cal-list-del" title="削除"
+            onclick="event.stopPropagation(); deleteCalEventByKey('${ev.date}','${ev.kind}','${escapeJsStr(ev.round)}', ${ev.custom ? ev.id : 'null'})">✕</button>
         </div>`;
     }).join('')}`;
   list.style.display = 'block';
